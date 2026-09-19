@@ -3,9 +3,13 @@ import requests
 import warnings
 import time
 import json
+from dotenv import load_dotenv
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound
 import re
 import google.generativeai as genai
+
+# Load environment variables from .env file
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 # Suppress some warnings
 warnings.filterwarnings("ignore")

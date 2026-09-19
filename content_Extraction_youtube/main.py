@@ -4,9 +4,13 @@ import warnings
 import time
 import sys
 import re
+from dotenv import load_dotenv
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound
 from youtube_transcript_api.formatters import SRTFormatter
 import google.generativeai as genai
+
+# Load environment variables from .env file
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 # Reconfigure stdout to support printing emojis and unicode characters on Windows
 sys.stdout.reconfigure(encoding='utf-8')
