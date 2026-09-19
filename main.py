@@ -231,6 +231,26 @@ def newspaper_endpoint(user_id: str, db: Session = Depends(get_db)):
             "timestamp": g.updated_at.isoformat() + "Z"
         })
         
+    NEWS_CATEGORIES = {"TECHNOLOGY", "BUSINESS", "SPORTS", "POLITICS", "SCIENCE"}
+    OTHER_CATEGORIES = {"ENTERTAINMENT", "OTHER"}
+
+    def get_sort_key(s):
+        cat = s["category"].upper()
+        if cat in NEWS_CATEGORIES:
+            tier = 0
+        elif cat in OTHER_CATEGORIES:
+            tier = 1
+        else:
+            tier = 2
+            
+        imp_map = {"lead": 0, "major": 1, "minor": 2, "feature": 3}
+        imp_val = imp_map.get(s.get("importance", "minor").lower(), 3)
+        
+        return (tier, imp_val)
+        
+    stories.sort(key=lambda s: s["timestamp"], reverse=True)
+    stories.sort(key=get_sort_key)
+        
     return {
         "_id": f"edition_{user_id}",
         "editionNumber": ed_state.current_edition_number,

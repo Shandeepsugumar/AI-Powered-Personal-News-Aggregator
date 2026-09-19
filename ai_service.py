@@ -6,6 +6,7 @@ import requests
 from typing import List, Dict, Any
 from sentence_transformers import SentenceTransformer
 from dotenv import load_dotenv
+from content_parser import chunk_content
 
 def safe_print(*args, **kwargs):
     """Print that won't crash on Windows cp1252 when LLM output has exotic Unicode."""
@@ -62,7 +63,7 @@ def call_openrouter(model: str, system_prompt: str, user_content: str, max_retri
     
     for attempt in range(max_retries):
         try:
-            resp = requests.post(f"{OPENROUTER_URL}/chat/completions", headers=headers, json=payload, timeout=15)
+            resp = requests.post(f"{OPENROUTER_URL}/chat/completions", headers=headers, json=payload, timeout=45)
         except Exception as e:
             print(f"OpenRouter Request Exception: {e}")
             wait_time = 2 ** attempt
@@ -107,7 +108,7 @@ def call_groq(model: str, system_prompt: str, user_content: str, max_retries: in
     
     for attempt in range(max_retries):
         try:
-            resp = requests.post(f"{GROQ_URL}/chat/completions", headers=headers, json=payload, timeout=10)
+            resp = requests.post(f"{GROQ_URL}/chat/completions", headers=headers, json=payload, timeout=60)
         except Exception as e:
             print(f"Groq Request Exception: {e}")
             wait_time = 2 ** attempt
@@ -138,18 +139,54 @@ def call_groq(model: str, system_prompt: str, user_content: str, max_retries: in
 def summarize_content(raw_content: str) -> Dict[str, Any]:
     """
     LLM 1 (Content-level): Summarize raw content.
+    Implements map-reduce chunking for long content (>15000 chars) to stay within context windows.
     """
-    system_prompt = (
-        "You are an AI news summarizer. You MUST output strict JSON only, with EXACTLY these keys:\n"
-        '- "is_news": boolean (true if the content describes any real-world event, product, company action, rumor, leak, prediction, analyst report, or factual claim — even if short or speculative. Only set false for literal spam, filler text, or completely empty content)\n'
-        '- "headline": string (crisp, engaging)\n'
-        '- "summary": string (concise summary of the content)\n'
-        '- "category": string (e.g. TECHNOLOGY, POLITICS, FINANCE)\n'
-        '- "event": string (short description of the specific real-world event)\n'
+    chunks = chunk_content(raw_content, max_chars=15000)
+    
+    # If content is short, do the standard single pass
+    if len(chunks) == 1:
+        return _summarize_single_pass(chunks[0])
+        
+    # Map Phase: extract key facts/summary per chunk
+    print(f"Content length {len(raw_content)} exceeds threshold. Splitting into {len(chunks)} chunks.")
+    chunk_summaries = []
+    chunk_prompt = (
+        "You are an AI assistant. Extract the main facts and a brief summary from this chunk of text. "
+        "Output strict JSON with these keys:\n"
+        '- "summary": string\n'
         '- "key_facts": list of strings'
     )
     
-    result_str = call_groq(MODEL_LLM1, system_prompt, raw_content)
+    for i, chunk in enumerate(chunks):
+        print(f"  Processing chunk {i+1}/{len(chunks)}...")
+        res_str = call_groq(MODEL_LLM1, chunk_prompt, chunk)
+        try:
+            chunk_data = json.loads(res_str)
+            if chunk_data.get("_status") != "failed":
+                chunk_summaries.append(f"Chunk {i+1}:\nSummary: {chunk_data.get('summary', '')}\nFacts: {', '.join(chunk_data.get('key_facts', []))}")
+        except json.JSONDecodeError:
+            print(f"  Warning: Failed to parse JSON for chunk {i+1}")
+            
+    if not chunk_summaries:
+        return {"_status": "failed"}
+        
+    # Reduce Phase: combine partial summaries into final struct
+    print("Combining chunk summaries into final output...")
+    combined_text = "\n\n".join(chunk_summaries)
+    return _summarize_single_pass(combined_text)
+
+def _summarize_single_pass(content_text: str) -> Dict[str, Any]:
+    system_prompt = (
+        "You are an AI news summarizer. You MUST output strict JSON only, with EXACTLY these keys:\n"
+        '- "is_news": boolean (true for ANY content with actual substance worth summarizing — real news, analysis, comedy/entertainment performances, self-help/advice content, etc. Only set false for genuine filler: spam, ads, empty/near-empty content, or pure boilerplate like "like and subscribe" with nothing else of substance)\n'
+        '- "headline": string (crisp, engaging)\n'
+        '- "summary": string (concise summary of the content)\n'
+        '- "category": string (e.g. TECHNOLOGY, BUSINESS, POLITICS, SCIENCE, SPORTS, ENTERTAINMENT, OTHER. Note: "SCIENCE" includes psychology, neuroscience, cognitive science, and health/medical research. "TECHNOLOGY" is strictly for products, software, hardware, and engineering topics. Comedy/entertainment performances -> "ENTERTAINMENT". Self-help/motivational/personal-development -> "OTHER")\n'
+        '- "event": string (short description of the specific event or subject)\n'
+        '- "key_facts": list of strings'
+    )
+    
+    result_str = call_groq(MODEL_LLM1, system_prompt, content_text)
     try:
         res = json.loads(result_str)
         if res.get("_status") == "failed":
