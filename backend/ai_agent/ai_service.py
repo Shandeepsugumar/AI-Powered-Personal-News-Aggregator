@@ -4,7 +4,7 @@ import time
 import sys
 import requests
 from typing import List, Dict, Any
-from sentence_transformers import SentenceTransformer
+from fastembed import TextEmbedding
 from dotenv import load_dotenv
 from utils.content_parser import chunk_content
 
@@ -27,7 +27,7 @@ GROQ_URL = "https://api.groq.com/openai/v1"
 MODEL_LLM1 = "openai/gpt-oss-120b"
 MODEL_LLM2 = "deepseek/deepseek-v4-flash-0731:free"
 
-embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+embedding_model = TextEmbedding('BAAI/bge-small-en-v1.5')
 
 def check_models_available():
     """Query OpenRouter to ensure our target free models are available."""
@@ -196,7 +196,7 @@ def _summarize_single_pass(content_text: str) -> Dict[str, Any]:
         return {"_status": "failed"}
 
 def generate_embedding(text: str) -> List[float]:
-    return embedding_model.encode(text).tolist()
+    return next(embedding_model.embed([text])).tolist()
 
 def merge_decision(new_item_summary: Dict[str, Any], candidates: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
