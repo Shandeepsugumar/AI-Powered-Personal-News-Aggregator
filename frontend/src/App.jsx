@@ -33,7 +33,7 @@ export default function App() {
   const fetchArchivesList = async (token) => {
     if (!token) return;
     try {
-      const res = await fetch(`http://${window.location.hostname}:8000/api/newspaper/archives`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL || "http://localhost:8000"}` + ""}/api/newspaper/archives`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -50,7 +50,7 @@ export default function App() {
     setIsLoading(true);
     try {
       // 1. Fetch latest edition (creates Edition #1 automatically if none today)
-      const res = await fetch(`http://${window.location.hostname}:8000/api/newspaper/latest`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL || "http://localhost:8000"}` + ""}/api/newspaper/latest`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -90,7 +90,7 @@ export default function App() {
 
     // 2. Followed Sources (From Backend if logged in, else LocalStorage)
     if (parsedUser?.token) {
-      fetch(`http://${window.location.hostname}:8000/api/sources`, {
+      fetch(`${import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL || "http://localhost:8000"}` + ""}/api/sources`, {
         headers: { 'Authorization': `Bearer ${parsedUser.token}` }
       })
         .then(res => res.json())
@@ -138,7 +138,7 @@ export default function App() {
     setUser(userData);
     if (userData?.token) {
       // 1. Fetch sources from MongoDB
-      fetch(`http://${window.location.hostname}:8000/api/sources`, {
+      fetch(`${import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL || "http://localhost:8000"}` + ""}/api/sources`, {
         headers: { 'Authorization': `Bearer ${userData.token}` }
       })
         .then(res => res.json())
@@ -186,7 +186,7 @@ export default function App() {
     // If user is authenticated, call backend POST /api/newspaper/refresh
     if (user?.token) {
       try {
-        const response = await fetch(`http://${window.location.hostname}:8000/api/newspaper/refresh`, {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL || "http://localhost:8000"}` + ""}/api/newspaper/refresh`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -269,7 +269,7 @@ export default function App() {
     if (user?.token) {
       try {
         setIsLoading(true);
-        const res = await fetch(`http://${window.location.hostname}:8000/api/newspaper/archive?date=${encodeURIComponent(normalizedDate)}`, {
+        const res = await fetch(`${import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL || "http://localhost:8000"}` + ""}/api/newspaper/archive?date=${encodeURIComponent(normalizedDate)}`, {
           headers: { 'Authorization': `Bearer ${user.token}` }
         });
         if (res.ok) {
@@ -296,7 +296,7 @@ export default function App() {
     setCooldownNotice(null);
 
     try {
-      const res = await fetch(`http://${window.location.hostname}:8000/api/newspaper/edition/${editionId}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL || "http://localhost:8000"}` + ""}/api/newspaper/edition/${editionId}`, {
         headers: { 'Authorization': `Bearer ${user.token}` }
       });
       if (res.ok) {

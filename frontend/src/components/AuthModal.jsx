@@ -37,7 +37,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, user }) {
 
     try {
       // 1. Try login first
-      let response = await fetch(`http://${window.location.hostname}:8000/api/auth/login`, {
+      let response = await fetch(`${import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL || "http://localhost:8000"}` + ""}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: demoEmail, password: demoPassword })
@@ -46,7 +46,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, user }) {
 
       // 2. If login fails because user doesn't exist, auto-register demo user
       if (!response.ok) {
-        response = await fetch(`http://${window.location.hostname}:8000/api/auth/register`, {
+        response = await fetch(`${import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL || "http://localhost:8000"}` + ""}/api/auth/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: demoName, email: demoEmail, password: demoPassword })
@@ -74,7 +74,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, user }) {
     setError('');
     setIsLoading(true);
 
-    const endpoint = isRegister ? `http://${window.location.hostname}:8000/api/auth/register` : `http://${window.location.hostname}:8000/api/auth/login`;
+    const endpoint = isRegister ? `${import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL || "http://localhost:8000"}` + ""}/api/auth/register` : `${import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL || "http://localhost:8000"}` + ""}/api/auth/login`;
     const body = isRegister 
       ? { name, email, password }
       : { email, password };

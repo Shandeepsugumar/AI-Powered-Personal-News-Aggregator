@@ -30,7 +30,7 @@ export default function SourceManager({ isOpen, onClose, token, sources = [], on
       if (!authToken) return;
 
       try {
-        const res = await fetch(`http://${window.location.hostname}:8000/api/sources`, {
+        const res = await fetch(`${import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL || "http://localhost:8000"}` + ""}/api/sources`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
         });
         const data = await res.json();
@@ -69,7 +69,7 @@ export default function SourceManager({ isOpen, onClose, token, sources = [], on
       else if (cleanType.includes('RSS')) cleanType = 'RSS';
 
       if (authToken) {
-        const res = await fetch(`http://${window.location.hostname}:8000/api/sources`, {
+        const res = await fetch(`${import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL || "http://localhost:8000"}` + ""}/api/sources`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -118,7 +118,7 @@ export default function SourceManager({ isOpen, onClose, token, sources = [], on
     setIsLoading(true);
     try {
       if (authToken) {
-        const res = await fetch(`http://${window.location.hostname}:8000/api/sources`, {
+        const res = await fetch(`${import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL || "http://localhost:8000"}` + ""}/api/sources`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -163,7 +163,7 @@ export default function SourceManager({ isOpen, onClose, token, sources = [], on
     const authToken = token || JSON.parse(localStorage.getItem('feedtoread_user') || '{}')?.token;
     if (authToken && !String(id).startsWith('src_')) {
       try {
-        const res = await fetch(`http://${window.location.hostname}:8000/api/sources/${id}/toggle`, {
+        const res = await fetch(`${import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL || "http://localhost:8000"}` + ""}/api/sources/${id}/toggle`, {
           method: 'PATCH',
           headers: { 'Authorization': `Bearer ${authToken}` }
         });
@@ -193,7 +193,7 @@ export default function SourceManager({ isOpen, onClose, token, sources = [], on
     const authToken = token || JSON.parse(localStorage.getItem('feedtoread_user') || '{}')?.token;
     if (authToken && !String(id).startsWith('src_')) {
       try {
-        await fetch(`http://${window.location.hostname}:8000/api/sources/${id}`, {
+        await fetch(`${import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL || "http://localhost:8000"}` + ""}/api/sources/${id}`, {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${authToken}` }
         });
