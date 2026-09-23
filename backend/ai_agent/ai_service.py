@@ -6,7 +6,7 @@ import requests
 from typing import List, Dict, Any
 from sentence_transformers import SentenceTransformer
 from dotenv import load_dotenv
-from content_parser import chunk_content
+from utils.content_parser import chunk_content
 
 def safe_print(*args, **kwargs):
     """Print that won't crash on Windows cp1252 when LLM output has exotic Unicode."""
@@ -154,7 +154,7 @@ def summarize_content(raw_content: str) -> Dict[str, Any]:
         "You are an AI assistant. Extract the main facts and a brief summary from this chunk of text. "
         "Output strict JSON with these keys:\n"
         '- "summary": string\n'
-        '- "key_facts": list of strings'
+        '- "key_facts": list of strings\n'          '- "stance": "POSITIVE" | "NEUTRAL" | "NEGATIVE"'
     )
     
     for i, chunk in enumerate(chunks):
@@ -178,12 +178,12 @@ def summarize_content(raw_content: str) -> Dict[str, Any]:
 def _summarize_single_pass(content_text: str) -> Dict[str, Any]:
     system_prompt = (
         "You are an AI news summarizer. You MUST output strict JSON only, with EXACTLY these keys:\n"
-        '- "is_news": boolean (true for ANY content with actual substance worth summarizing — real news, analysis, comedy/entertainment performances, self-help/advice content, etc. Only set false for genuine filler: spam, ads, empty/near-empty content, or pure boilerplate like "like and subscribe" with nothing else of substance)\n'
+        '- "is_news": boolean (true for VIRTUALLY EVERYTHING with actual substance worth summarizing — real news, analysis, comedy/entertainment performances, short films, vlogs, fiction, self-help/advice content, etc. ONLY set false for genuine spam, ads, empty/near-empty content, or pure boilerplate like "like and subscribe". If it is a video transcript of a film or story, it IS news/entertainment, set true)\n'
         '- "headline": string (crisp, engaging)\n'
         '- "summary": string (concise summary of the content)\n'
         '- "category": string (e.g. TECHNOLOGY, BUSINESS, POLITICS, SCIENCE, SPORTS, ENTERTAINMENT, OTHER. Note: "SCIENCE" includes psychology, neuroscience, cognitive science, and health/medical research. "TECHNOLOGY" is strictly for products, software, hardware, and engineering topics. Comedy/entertainment performances -> "ENTERTAINMENT". Self-help/motivational/personal-development -> "OTHER")\n'
         '- "event": string (short description of the specific event or subject)\n'
-        '- "key_facts": list of strings'
+        '- "key_facts": list of strings\n'          '- "stance": "POSITIVE" | "NEUTRAL" | "NEGATIVE"'
     )
     
     result_str = call_groq(MODEL_LLM1, system_prompt, content_text)

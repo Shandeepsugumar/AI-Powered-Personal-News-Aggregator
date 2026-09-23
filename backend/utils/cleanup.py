@@ -1,5 +1,5 @@
 from datetime import datetime
-from database import SessionLocal, NewsItem
+from db.database import SessionLocal, NewsItem
 
 def cleanup_expired_items():
     db = SessionLocal()

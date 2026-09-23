@@ -116,7 +116,7 @@ def load_transcript(video_id):
         return f.read()
 
 
-def build_payload(video_id, transcript, meta):
+def build_payload(video_id, transcript, meta, force=False):
     """Build the exact /ingest payload from transcript + sidecar metadata."""
     fetched_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     return {
@@ -127,6 +127,7 @@ def build_payload(video_id, transcript, meta):
         "content": transcript,
         "published_at": meta.get("published_at"),
         "fetched_at": fetched_at,
+        "force": force,
     }
 
 
@@ -151,7 +152,7 @@ def ingest_video(video_id, server_url, force=False):
     safe_print(f"  Date    : {meta.get('published_at') or '(unknown)'}")
     safe_print(f"  Length  : {len(transcript):,} chars")
 
-    payload = build_payload(video_id, transcript, meta)
+    payload = build_payload(video_id, transcript, meta, force=force)
 
     print(f"  POSTing to {server_url} ...")
     try:
@@ -165,6 +166,11 @@ def ingest_video(video_id, server_url, force=False):
             print(f"  [OK] status={status}  decision={decision}")
         else:
             print(f"  [OK] status={status}  reason={reason}")
+            
+        trace = data.get("trace")
+        if trace:
+            safe_print("\n" + trace.strip() + "\n")
+            
         return status in ("success", "skipped")
     except requests.exceptions.ConnectionError:
         print(f"  [ERROR] Cannot connect to {server_url}. Is the FastAPI server running?")

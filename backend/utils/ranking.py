@@ -1,7 +1,15 @@
+import sys
+def safe_print(*args, **kwargs):
+    try:
+        print(*args, **kwargs)
+    except UnicodeEncodeError:
+        text = " ".join(str(a) for a in args)
+        print(text.encode('ascii', errors='replace').decode('ascii'), **kwargs)
+
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timedelta
-from database import StoryGroup, StorySource
+from db.database import StoryGroup, StorySource
 
 def recompute_importance_ranking(db: Session, freshness_hours: int = 48):
     """
@@ -47,6 +55,14 @@ def recompute_importance_ranking(db: Session, freshness_hours: int = 48):
     # Sort by source_count DESC, then updated_at DESC
     news_stats.sort(key=lambda x: (x["source_count"], x["updated_at"]), reverse=True)
     
+    safe_print("\n========== STAGE: IMPORTANCE RANKING ==========")
+    safe_print("Ranking Active Story Groups:")
+    
+    # Print the ones that were skipped first
+    for group in active_groups:
+        if group.category.upper() not in NEWS_CATEGORIES:
+            safe_print(f"  - '{group.headline}' | Sources: N/A | Updated: {group.updated_at} -> SKIPPED ranking math - OTHER_CATEGORIES - hardcoded 'feature'")
+            
     # Assign labels
     for idx, stat in enumerate(news_stats):
         group = stat["group"]
@@ -59,4 +75,7 @@ def recompute_importance_ranking(db: Session, freshness_hours: int = 48):
         else:
             group.importance = "minor"
             
+        safe_print(f"  - '{group.headline}' | Sources: {source_count} | Updated: {stat['updated_at']} -> {group.importance}")
+
+    safe_print("===============================================\n")
     db.commit()

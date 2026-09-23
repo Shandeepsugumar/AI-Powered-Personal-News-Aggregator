@@ -1,5 +1,5 @@
 import os
-from ai_service import merge_summaries
+from ai_agent.ai_service import merge_summaries
 
 def run_test():
     # Ensure you have a valid Groq API key set for this test

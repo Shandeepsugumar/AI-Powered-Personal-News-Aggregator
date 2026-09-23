@@ -1,0 +1,51 @@
+[
+  {
+    "id": "story-001",
+    "headline": "Apple Unveils M4 Silicon with Dedicated Local AI Acceleration",
+    "category": "Technology",
+    "stance": "Neutral",
+    "importance": "lead",
+    "summary": "Apple officially debuted its next-generation M4 architecture, placing unprecedented emphasis on local inference capabilities and power efficiency. The silicon redesign targets demanding on-device neural workloads without forcing users to offload computations to cloud services.",
+    "sources": [
+      { "name": "MKBHD", "url": "https://youtube.com", "type": "YOUTUBE" },
+      { "name": "TechCrunch", "url": "https://techcrunch.com", "type": "BLOG" }
+    ],
+    "timestamp": "2026-09-18T10:00:00Z"
+  },
+  {
+    "id": "story-002",
+    "headline": "OpenAI Releases Open Weights Research Suite to Global Labs",
+    "category": "Technology",
+    "stance": "Positive",
+    "importance": "major",
+    "summary": "In an unexpected strategic shift, the research team published weights for an open alignment model, emphasizing collaborative safety audits and decentralized model verification.",
+    "sources": [
+      { "name": "The Verge", "url": "https://theverge.com", "type": "BLOG" }
+    ],
+    "timestamp": "2026-09-18T09:30:00Z"
+  },
+  {
+    "id": "story-003",
+    "headline": "Critique: The Fragile Economics of Subsidized Cloud Compute",
+    "category": "Opinion",
+    "stance": "Negative",
+    "importance": "major",
+    "summary": "Escalating operational expenses for generative workloads are threatening software startup margins. Industry observers warn that current flat-rate pricing models cannot survive high-token production usage.",
+    "sources": [
+      { "name": "Stratechery", "url": "https://stratechery.com", "type": "NEWSLETTER" }
+    ],
+    "timestamp": "2026-09-18T08:15:00Z"
+  },
+  {
+    "id": "story-004",
+    "headline": "SpaceX Completes 48-Hour Rapid Turnaround Booster Milestone",
+    "category": "Science",
+    "stance": "Neutral",
+    "importance": "minor",
+    "summary": "Operational cadence reached a new peak this morning as commercial launch crews cleared static fire tests and turnaround inspections in under two days.",
+    "sources": [
+      { "name": "Everyday Astronaut", "url": "https://youtube.com", "type": "YOUTUBE" }
+    ],
+    "timestamp": "2026-09-18T07:45:00Z"
+  }
+]

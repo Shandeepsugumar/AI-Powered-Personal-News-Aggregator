@@ -4,7 +4,13 @@ from sqlalchemy import create_engine, Column, Integer, String, Text, Boolean, Da
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 
-DATABASE_URL = "sqlite:///./feedtoread.db"
+import os
+import pathlib
+
+# Get the absolute path to the project root (two levels up from database.py)
+PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
+DB_PATH = PROJECT_ROOT / "feedtoread.db"
+DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 from sqlalchemy import event as sa_event
 
@@ -43,6 +49,7 @@ class SummaryItem(Base):
     category = Column(String, nullable=False)
     is_news = Column(Boolean, default=True)
     event = Column(String, nullable=True)
+    stance = Column(String, nullable=True)
     key_facts = Column(JSON, nullable=True)
 
 class StoryGroup(Base):
@@ -72,21 +79,10 @@ class StorySource(Base):
 
     group = relationship("StoryGroup", back_populates="sources")
 
-class UserStoryStatus(Base):
-    __tablename__ = "user_story_status"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String, index=True, nullable=False)
-    story_id = Column(Integer, ForeignKey("story_groups.id"))
-    first_seen_at = Column(DateTime, default=datetime.utcnow)
-    read_at = Column(DateTime, nullable=True)
 
-class EditionState(Base):
-    __tablename__ = "edition_state"
 
-    user_id = Column(String, primary_key=True, index=True)
-    current_edition_number = Column(Integer, default=0)
-
+# Create tables
 Base.metadata.create_all(bind=engine)
 
 def get_db():

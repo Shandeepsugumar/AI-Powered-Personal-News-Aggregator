@@ -1,4 +1,5 @@
 import os
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 import requests
 import warnings
 import time
@@ -64,24 +65,27 @@ def translate_text_with_ollama(tamil_text):
         return tamil_text
 
 def fetch_from_api(video_id):
-    """Attempt to fetch from YouTube API. Returns (fetched_transcript_object, language)"""
     try:
-        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
-        transcript = None
-        lang = None
-        
-        # Try to find English first
+        api = YouTubeTranscriptApi()
+        # Fetch English directly
         try:
-            transcript = transcript_list.find_transcript(['en', 'en-IN', 'en-GB', 'en-US'])
-            lang = 'en'
-        except NoTranscriptFound:
-            try:
-                transcript = transcript_list.find_transcript(['ta'])
-                lang = 'ta'
-            except NoTranscriptFound:
-                return None, None
-                
-        return transcript, lang
+            fetched_data = api.fetch(video_id, languages=['en', 'en-IN', 'en-GB', 'en-US'])
+            class DummyTranscript:
+                def fetch(self): return fetched_data
+            return DummyTranscript(), 'en'
+        except Exception:
+            pass
+            
+        # Fallback to Tamil
+        try:
+            fetched_data = api.fetch(video_id, languages=['ta'])
+            class DummyTranscript:
+                def fetch(self): return fetched_data
+            return DummyTranscript(), 'ta'
+        except Exception:
+            pass
+            
+        return None, None
     except Exception as e:
         print(f"YouTube API failed to find transcript: {type(e).__name__} - {e}")
         return None, None
@@ -190,12 +194,12 @@ def process_video(video_id):
     if transcript_obj and lang == 'en':
         print("SUCCESS: Found English transcript directly via YouTube API!")
         fetched_data = transcript_obj.fetch()
-        plain_text = "\n".join(snippet['text'] for snippet in fetched_data)
+        plain_text = "\n".join(getattr(snippet, 'text', '') for snippet in fetched_data)
         
     elif transcript_obj and lang == 'ta':
         print("SUCCESS: Found Tamil transcript via YouTube API!")
         fetched_data = transcript_obj.fetch()
-        tamil_plain = "\n".join(snippet['text'] for snippet in fetched_data)
+        tamil_plain = "\n".join(getattr(snippet, 'text', '') for snippet in fetched_data)
         plain_text = translate_text_with_ollama(tamil_plain)
         
     else:
@@ -209,7 +213,7 @@ def process_video(video_id):
             os.remove(audio_file)
             
     # Save Output
-    with open(f"{video_id}.txt", "w", encoding="utf-8") as f:
+    with open(os.path.join(SCRIPT_DIR, f"{video_id}.txt"), "w", encoding="utf-8") as f:
         f.write(plain_text)
         
     print(f"\nFile created successfully:")
@@ -217,10 +221,20 @@ def process_video(video_id):
     
     # Save metadata sidecar JSON
     meta = fetch_video_metadata(video_id)
-    meta_path = f"{video_id}.json"
+    meta_path = os.path.join(SCRIPT_DIR, f"{video_id}.json")
     with open(meta_path, "w", encoding="utf-8") as f:
         json.dump(meta, f, indent=2, ensure_ascii=False)
     print(f"{video_id}.json  (title: {meta.get('title', 'unknown')}, channel: {meta.get('channel_name', 'unknown')})")
+    
+    # NEW: Auto-trigger ingestion
+    try:
+        from ingest_bridge import ingest_video
+        print("\nTriggering auto-ingestion pipeline...")
+        ingest_video(video_id, "http://localhost:8000/ingest")
+    except ImportError:
+        print("\nCould not import ingest_bridge.py for auto-ingestion.")
+    except Exception as err:
+        print(f"\nError during auto-ingestion: {err}")
 
 def extract_video_id(url_or_id):
     match = re.search(r'(?:v=|\/)([0-9A-Za-z_-]{11})(?:\?|&|$)', url_or_id)

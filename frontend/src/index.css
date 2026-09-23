@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --newsprint: #F8F5EE;
+    --newsprint-darker: #EFECE4;
+    --ink: #1C1A17;
+    --ink-light: #2A2724;
+    --ink-muted: #57524D;
+    --border-hairline: #D5CEC2;
+    --border-ink: #262624;
+  }
+
+  body {
+    background-color: #F8F5EE;
+    color: #1C1A17;
+    font-family: 'Newsreader', 'EB Garamond', Georgia, serif;
+    -webkit-font-smoothing: antialiased;
+    background-image: radial-gradient(#262624 0.4px, transparent 0.4px);
+    background-size: 24px 24px;
+    background-color: #F8F5EE;
+  }
+}
+
+.font-masthead {
+  font-family: 'Cinzel', 'Bodoni Moda', 'Playfair Display', Georgia, serif;
+}
+
+.font-headline {
+  font-family: 'Bodoni Moda', 'Playfair Display', Georgia, serif;
+}
+
+.font-editorial-body {
+  font-family: 'Newsreader', 'EB Garamond', Georgia, serif;
+}
+
+.font-ticker {
+  font-family: 'JetBrains Mono', 'Courier Prime', monospace;
+}
+
+.font-typewriter {
+  font-family: 'Courier Prime', monospace;
+}
+
+/* Authentic editorial drop cap */
+.drop-cap::first-letter {
+  font-family: 'Cinzel', 'Bodoni Moda', 'Playfair Display', Georgia, serif;
+  font-size: 4.2rem;
+  line-height: 0.75;
+  float: left;
+  font-weight: 800;
+  margin-right: 0.65rem;
+  margin-top: 0.2rem;
+  margin-bottom: -0.1rem;
+  color: #1C1A17;
+}
+
+/* Double vintage border */
+.border-double-vintage {
+  border-style: double;
+  border-width: 4px;
+  border-color: #262624;
+}
+
+/* Hairline border rule */
+.border-hairline {
+  border-color: #D5CEC2;
+}
+
+/* Shimmer animation */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, #EFECE4 25%, #F8F5EE 50%, #EFECE4 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s infinite ease-in-out;
+}
+

@@ -1,0 +1,1 @@
+while ($true) { try { $res = Invoke-RestMethod http://localhost:8000/health -ErrorAction Stop; if ($res.status -eq 'ok') { break } } catch { Start-Sleep -Seconds 2 } }; .\.venv\Scripts\python -u tests.py
