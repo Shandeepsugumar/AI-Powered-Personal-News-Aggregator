@@ -11,3 +11,8 @@ beanie
 beautifulsoup4
 feedparser
 youtube-transcript-api
+scikit-learn
+bcrypt
+passlib
+python-jose
+google-generativeai
