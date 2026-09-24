@@ -74,198 +74,203 @@ class MarkReadRequest(BaseModel):
 
 @app.post("/ingest")
 def ingest_endpoint(req: IngestRequest, db: Session = Depends(get_db)):
-    _thread_local.capture_buffer = io.StringIO()
-    # 1. Content Parser
-    cleaned_content = parse_content(req.content)
+    try:
+        _thread_local.capture_buffer = io.StringIO()
+        # 1. Content Parser
+        cleaned_content = parse_content(req.content)
     
-    if not is_meaningful_content(cleaned_content):
-        return {"status": "skipped", "reason": "Content not meaningful/too short", "trace": _thread_local.capture_buffer.getvalue()}
+        if not is_meaningful_content(cleaned_content):
+            return {"status": "skipped", "reason": "Content not meaningful/too short", "trace": _thread_local.capture_buffer.getvalue()}
         
-    content_hash = compute_content_hash(cleaned_content)
+        content_hash = compute_content_hash(cleaned_content)
     
-    # 2. Exact-duplicate check
-    existing = db.query(ContentItem).filter(ContentItem.content_hash == content_hash).first()
-    if existing and not req.force:
-        return {"status": "skipped", "reason": "Exact duplicate content hash", "trace": _thread_local.capture_buffer.getvalue()}
+        # 2. Exact-duplicate check
+        existing = db.query(ContentItem).filter(ContentItem.content_hash == content_hash).first()
+        if existing and not req.force:
+            return {"status": "skipped", "reason": "Exact duplicate content hash", "trace": _thread_local.capture_buffer.getvalue()}
         
-    now = datetime.utcnow()
-    pub_at = datetime.fromisoformat(req.published_at.replace("Z", "+00:00")).replace(tzinfo=None) if req.published_at else None
-    fetch_at = datetime.fromisoformat(req.fetched_at.replace("Z", "+00:00")).replace(tzinfo=None) if req.fetched_at else now
+        now = datetime.utcnow()
+        pub_at = datetime.fromisoformat(req.published_at.replace("Z", "+00:00")).replace(tzinfo=None) if req.published_at else None
+        fetch_at = datetime.fromisoformat(req.fetched_at.replace("Z", "+00:00")).replace(tzinfo=None) if req.fetched_at else now
 
-    content_item = ContentItem(
-        source_name=req.source_name,
-        source_type=req.source_type,
-        source_url=req.source_url,
-        title=req.title,
-        raw_content=cleaned_content,
-        content_hash=content_hash,
-        published_at=pub_at,
-        fetched_at=fetch_at
-    )
-    db.add(content_item)
-    db.commit()  # Commit immediately to release write lock before slow LLM calls
-    db.refresh(content_item)  # Re-attach to session with ID
-    
-    safe_print(f"Calling LLM 1 for content_hash: {content_hash}")
-    # 3. LLM 1
-    llm1_res = summarize_content(cleaned_content)
-    safe_print(f"LLM 1 returned: {llm1_res.get('_status', 'success')}")
-    
-    if llm1_res.get("_status") == "failed":
-        content_item.processing_status = "failed"
-        db.commit()
-        return {"status": "failed", "reason": "LLM 1 API error", "trace": _thread_local.capture_buffer.getvalue()}
-        
-    content_item.processing_status = "processed"
-    
-    is_news = llm1_res.get("is_news", False)
-    if req.source_type.upper() == "YOUTUBE":
-        is_news = True  # User explicitly requested all YouTube content to be displayed
-        
-    if not is_news:
-        db.commit()
-        return {"status": "skipped", "reason": "Not news", "trace": _thread_local.capture_buffer.getvalue()}
-        
-    summary_item = SummaryItem(
-        content_id=content_item.id,
-        headline=llm1_res.get("headline", ""),
-        summary=llm1_res.get("summary", ""),
-        category=llm1_res.get("category", "UNCATEGORIZED"),
-        is_news=True,
-        event=llm1_res.get("event", ""),
-        key_facts=llm1_res.get("key_facts", []),
-        stance=llm1_res.get("stance", "NEUTRAL")
-    )
-    db.add(summary_item)
-    db.commit()  # Commit summary before slow LLM 2 call
-    db.refresh(summary_item)
-    
-    # 4. Embed
-    emb_text = f"{summary_item.headline} {summary_item.summary}"
-    new_embedding = generate_embedding(emb_text)
-    
-    safe_print("\n========== STAGE: EMBEDDING ==========")
-    safe_print(f"Embedding Item: {summary_item.headline}")
-    safe_print(f"Vector Dimensions: {len(new_embedding)} dimensions")
-    safe_print(f"Vector Preview: [{', '.join(f'{x:.4f}' for x in new_embedding[:8])}, ...] ({len(new_embedding)} dims)")
-    safe_print("======================================\n")
-    
-    # 5. Candidate retrieval (Top-K=5)
-    freshness_limit = now - timedelta(hours=48)
-    active_groups = db.query(StoryGroup).filter(StoryGroup.updated_at >= freshness_limit).all()
-    
-    candidates = []
-    if active_groups:
-        group_embs = [json.loads(g.embedding) for g in active_groups if g.embedding]
-        valid_groups = [g for g in active_groups if g.embedding]
-        
-        if valid_groups:
-            sims = cosine_similarity([new_embedding], group_embs)[0]
-            all_indices = np.argsort(sims)[::-1]
-            top_k_indices = all_indices[:5]
-            
-            safe_print("\n========== STAGE: CANDIDATE RETRIEVAL ==========")
-            safe_print(f"New Item: {summary_item.headline}")
-            safe_print(f"Searching against {len(valid_groups)} active stories within the 48h window")
-            
-            for i, idx in enumerate(all_indices):
-                g = valid_groups[idx]
-                score = float(sims[idx])
-                marker = " -> TOP 5 SENT TO LLM 2" if i < 5 else ""
-                safe_print(f"  {score:.4f} - {g.headline}{marker}")
-                
-                if i < 5:
-                    candidates.append({
-                        "id": g.id,
-                        "headline": g.headline,
-                        "summary": g.summary,
-                        "event": "N/A (Group)",
-                        "category": g.category
-                    })
-            safe_print("================================================\n")
-                
-    # 6. LLM 2
-    new_item_dict = {
-        "id": "new",
-        "headline": summary_item.headline,
-        "summary": summary_item.summary,
-        "event": summary_item.event,
-        "category": summary_item.category,
-        "key_facts": summary_item.key_facts,
-        "stance": "NEUTRAL"
-    }
-    
-    if not candidates:
-        llm2_res = {
-            "decision": "separate",
-            "target_group_id": None,
-            "has_conflict": False,
-            "final_headline": summary_item.headline,
-            "final_summary": summary_item.summary,
-            "category": summary_item.category,
-            "stance": summary_item.stance or "NEUTRAL"
-        }
-    else:
-        llm2_res = merge_decision(new_item_dict, candidates)
-    
-    if llm2_res.get("_status") == "failed":
-        content_item.processing_status = "failed_llm2"
-        db.commit()
-        return {"status": "failed", "reason": "LLM 2 API error"}
-        
-    decision = llm2_res.get("decision", "separate")
-    target_id = llm2_res.get("target_group_id")
-    
-    final_group = None
-    if decision == "merge" and target_id:
-        final_group = db.query(StoryGroup).filter(StoryGroup.id == int(target_id)).first()
-        
-    if final_group:
-        # Update existing
-        final_group.headline = llm2_res.get("final_headline", final_group.headline)
-        final_group.summary = llm2_res.get("final_summary", final_group.summary)
-        final_group.category = llm2_res.get("category", final_group.category)
-        final_group.stance = llm2_res.get("stance", final_group.stance)
-        final_group.updated_at = now
-        
-        # Re-embed
-        new_grp_emb = generate_embedding(f"{final_group.headline} {final_group.summary}")
-        final_group.embedding = json.dumps(new_grp_emb)
-        safe_print("\n========== STAGE: EMBEDDING (GROUP UPDATE) ==========")
-        safe_print(f"Embedding Group: {final_group.headline}")
-        safe_print(f"Vector Dimensions: {len(new_grp_emb)} dimensions")
-        safe_print(f"Vector Preview: [{', '.join(f'{x:.4f}' for x in new_grp_emb[:8])}, ...] ({len(new_grp_emb)} dims)")
-        safe_print("=====================================================\n")
-    else:
-        # separate or new_group
-        final_group = StoryGroup(
-            headline=llm2_res.get("final_headline", summary_item.headline),
-            summary=llm2_res.get("final_summary", summary_item.summary),
-            category=llm2_res.get("category", summary_item.category),
-            stance=llm2_res.get("stance", "NEUTRAL"),
-            embedding=json.dumps(new_embedding)
+        content_item = ContentItem(
+            source_name=req.source_name,
+            source_type=req.source_type,
+            source_url=req.source_url,
+            title=req.title,
+            raw_content=cleaned_content,
+            content_hash=content_hash,
+            published_at=pub_at,
+            fetched_at=fetch_at
         )
-        db.add(final_group)
-        db.flush()
+        db.add(content_item)
+        db.commit()  # Commit immediately to release write lock before slow LLM calls
+        db.refresh(content_item)  # Re-attach to session with ID
+    
+        safe_print(f"Calling LLM 1 for content_hash: {content_hash}")
+        # 3. LLM 1
+        llm1_res = summarize_content(cleaned_content)
+        safe_print(f"LLM 1 returned: {llm1_res.get('_status', 'success')}")
+    
+        if llm1_res.get("_status") == "failed":
+            content_item.processing_status = "failed"
+            db.commit()
+            return {"status": "failed", "reason": "LLM 1 API error", "trace": _thread_local.capture_buffer.getvalue()}
         
-    # Link source
-    story_source = StorySource(
-        story_id=final_group.id,
-        content_id=content_item.id,
-        source_name=content_item.source_name,
-        source_url=content_item.source_url,
-        source_type=content_item.source_type
-    )
-    db.add(story_source)
-    db.flush()
+        content_item.processing_status = "processed"
     
-    # 7. Importance Ranking
-    recompute_importance_ranking(db)
+        is_news = llm1_res.get("is_news", False)
+        if req.source_type.upper() == "YOUTUBE":
+            is_news = True  # User explicitly requested all YouTube content to be displayed
+        
+        if not is_news:
+            db.commit()
+            return {"status": "skipped", "reason": "Not news", "trace": _thread_local.capture_buffer.getvalue()}
+        
+        summary_item = SummaryItem(
+            content_id=content_item.id,
+            headline=llm1_res.get("headline", ""),
+            summary=llm1_res.get("summary", ""),
+            category=llm1_res.get("category", "UNCATEGORIZED"),
+            is_news=True,
+            event=llm1_res.get("event", ""),
+            key_facts=llm1_res.get("key_facts", []),
+            stance=llm1_res.get("stance", "NEUTRAL")
+        )
+        db.add(summary_item)
+        db.commit()  # Commit summary before slow LLM 2 call
+        db.refresh(summary_item)
     
-    db.commit()
+        # 4. Embed
+        emb_text = f"{summary_item.headline} {summary_item.summary}"
+        new_embedding = generate_embedding(emb_text)
     
-    trace_logs = _thread_local.capture_buffer.getvalue()
-    return {"status": "success", "story_group_id": final_group.id, "decision": decision, "trace": trace_logs}
+        safe_print("\n========== STAGE: EMBEDDING ==========")
+        safe_print(f"Embedding Item: {summary_item.headline}")
+        safe_print(f"Vector Dimensions: {len(new_embedding)} dimensions")
+        safe_print(f"Vector Preview: [{', '.join(f'{x:.4f}' for x in new_embedding[:8])}, ...] ({len(new_embedding)} dims)")
+        safe_print("======================================\n")
+    
+        # 5. Candidate retrieval (Top-K=5)
+        freshness_limit = now - timedelta(hours=48)
+        active_groups = db.query(StoryGroup).filter(StoryGroup.updated_at >= freshness_limit).all()
+    
+        candidates = []
+        if active_groups:
+            group_embs = [json.loads(g.embedding) for g in active_groups if g.embedding]
+            valid_groups = [g for g in active_groups if g.embedding]
+        
+            if valid_groups:
+                sims = cosine_similarity([new_embedding], group_embs)[0]
+                all_indices = np.argsort(sims)[::-1]
+                top_k_indices = all_indices[:5]
+            
+                safe_print("\n========== STAGE: CANDIDATE RETRIEVAL ==========")
+                safe_print(f"New Item: {summary_item.headline}")
+                safe_print(f"Searching against {len(valid_groups)} active stories within the 48h window")
+            
+                for i, idx in enumerate(all_indices):
+                    g = valid_groups[idx]
+                    score = float(sims[idx])
+                    marker = " -> TOP 5 SENT TO LLM 2" if i < 5 else ""
+                    safe_print(f"  {score:.4f} - {g.headline}{marker}")
+                
+                    if i < 5:
+                        candidates.append({
+                            "id": g.id,
+                            "headline": g.headline,
+                            "summary": g.summary,
+                            "event": "N/A (Group)",
+                            "category": g.category
+                        })
+                safe_print("================================================\n")
+                
+        # 6. LLM 2
+        new_item_dict = {
+            "id": "new",
+            "headline": summary_item.headline,
+            "summary": summary_item.summary,
+            "event": summary_item.event,
+            "category": summary_item.category,
+            "key_facts": summary_item.key_facts,
+            "stance": "NEUTRAL"
+        }
+    
+        if not candidates:
+            llm2_res = {
+                "decision": "separate",
+                "target_group_id": None,
+                "has_conflict": False,
+                "final_headline": summary_item.headline,
+                "final_summary": summary_item.summary,
+                "category": summary_item.category,
+                "stance": summary_item.stance or "NEUTRAL"
+            }
+        else:
+            llm2_res = merge_decision(new_item_dict, candidates)
+    
+        if llm2_res.get("_status") == "failed":
+            content_item.processing_status = "failed_llm2"
+            db.commit()
+            return {"status": "failed", "reason": "LLM 2 API error"}
+        
+        decision = llm2_res.get("decision", "separate")
+        target_id = llm2_res.get("target_group_id")
+    
+        final_group = None
+        if decision == "merge" and target_id:
+            final_group = db.query(StoryGroup).filter(StoryGroup.id == int(target_id)).first()
+        
+        if final_group:
+            # Update existing
+            final_group.headline = llm2_res.get("final_headline", final_group.headline)
+            final_group.summary = llm2_res.get("final_summary", final_group.summary)
+            final_group.category = llm2_res.get("category", final_group.category)
+            final_group.stance = llm2_res.get("stance", final_group.stance)
+            final_group.updated_at = now
+        
+            # Re-embed
+            new_grp_emb = generate_embedding(f"{final_group.headline} {final_group.summary}")
+            final_group.embedding = json.dumps(new_grp_emb)
+            safe_print("\n========== STAGE: EMBEDDING (GROUP UPDATE) ==========")
+            safe_print(f"Embedding Group: {final_group.headline}")
+            safe_print(f"Vector Dimensions: {len(new_grp_emb)} dimensions")
+            safe_print(f"Vector Preview: [{', '.join(f'{x:.4f}' for x in new_grp_emb[:8])}, ...] ({len(new_grp_emb)} dims)")
+            safe_print("=====================================================\n")
+        else:
+            # separate or new_group
+            final_group = StoryGroup(
+                headline=llm2_res.get("final_headline", summary_item.headline),
+                summary=llm2_res.get("final_summary", summary_item.summary),
+                category=llm2_res.get("category", summary_item.category),
+                stance=llm2_res.get("stance", "NEUTRAL"),
+                embedding=json.dumps(new_embedding)
+            )
+            db.add(final_group)
+            db.flush()
+        
+        # Link source
+        story_source = StorySource(
+            story_id=final_group.id,
+            content_id=content_item.id,
+            source_name=content_item.source_name,
+            source_url=content_item.source_url,
+            source_type=content_item.source_type
+        )
+        db.add(story_source)
+        db.flush()
+    
+        # 7. Importance Ranking
+        recompute_importance_ranking(db)
+    
+        db.commit()
+    
+        trace_logs = _thread_local.capture_buffer.getvalue()
+        return {"status": "success", "story_group_id": final_group.id, "decision": decision, "trace": trace_logs}
+
+    except Exception as e:
+        import traceback
+        return {"status": "500_error", "traceback": traceback.format_exc()}
 
 @app.post("/retry-failed")
 def retry_failed(db: Session = Depends(get_db)):
