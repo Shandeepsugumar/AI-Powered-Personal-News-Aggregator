@@ -22,31 +22,7 @@ import io
 import threading
 from contextlib import contextmanager
 
-# Thread-local storage for standard out hijacking
-_thread_local = threading.local()
 
-class ThreadLocalStdout:
-    def __init__(self, original_stdout):
-        self.original_stdout = original_stdout
-
-    def write(self, data):
-        self.original_stdout.write(data)
-        if getattr(_thread_local, "capture_buffer", None) is not None:
-            _thread_local.capture_buffer.write(data)
-
-    def flush(self):
-        self.original_stdout.flush()
-
-# Replace sys.stdout once at startup
-sys.stdout = ThreadLocalStdout(sys.stdout)
-
-@contextmanager
-def capture_logs():
-    _thread_local.capture_buffer = io.StringIO()
-    try:
-        yield _thread_local.capture_buffer
-    finally:
-        _thread_local.capture_buffer = None
 
 def safe_print(*args, **kwargs):
     """Print that won't crash on Windows cp1252 when LLM output has exotic Unicode."""
@@ -439,6 +415,7 @@ def retry_failed(db: Session = Depends(get_db)):
     db.commit()
     return results
 
+@app.get("/")
 @app.get("/health")
 def health():
     return {"status": "ok"}

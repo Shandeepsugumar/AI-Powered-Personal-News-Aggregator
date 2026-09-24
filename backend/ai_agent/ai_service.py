@@ -27,7 +27,7 @@ GROQ_URL = "https://api.groq.com/openai/v1"
 MODEL_LLM1 = "openai/gpt-oss-120b"
 MODEL_LLM2 = "deepseek/deepseek-v4-flash-0731:free"
 
-embedding_model = TextEmbedding('BAAI/bge-small-en-v1.5')
+embedding_model = TextEmbedding('BAAI/bge-small-en-v1.5', threads=1)
 
 def check_models_available():
     """Query OpenRouter to ensure our target free models are available."""
