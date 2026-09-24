@@ -20,6 +20,8 @@ from api.mongo_sources import router as sources_router
 from api.mongo_newspaper import router as mongo_newspaper_router
 import io
 import threading
+_thread_local = threading.local()
+import threading
 from contextlib import contextmanager
 
 
