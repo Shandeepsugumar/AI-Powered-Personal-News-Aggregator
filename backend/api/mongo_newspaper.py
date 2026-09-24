@@ -15,11 +15,12 @@ import time
 from datetime import datetime, timezone
 from typing import Optional, List
 
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Query
 from beanie import PydanticObjectId
 
 from db.mongo_models import Edition, Story, StorySource, User
 from api.mongo_auth import get_current_user
+from api.utils_extractor import trigger_extractors
 from datetime import datetime, timezone
 from typing import List, Optional
 from db.database import SessionLocal, StoryGroup
@@ -166,6 +167,7 @@ async def get_latest(current_user: User = Depends(get_current_user)):
     Return the latest edition for today.
     If none exists, auto-create Edition #1 (mirrors Node behaviour exactly).
     """
+    background_tasks.add_task(trigger_extractors)
     today = _local_date_string()
     todays_editions = await Edition.find(
         Edition.userId == current_user.id,
@@ -192,11 +194,12 @@ async def get_latest(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/refresh")
-async def refresh(current_user: User = Depends(get_current_user)):
+async def refresh(background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user)):
     """
     Generate a new edition with deduplicated stories.
     Returns {isNew, edition, message} - mirrors Node behaviour exactly.
     """
+    background_tasks.add_task(trigger_extractors)
     today = _local_date_string()
     now = datetime.utcnow()
 

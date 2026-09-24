@@ -108,7 +108,7 @@ def process_feed(source, feed_url):
         return
         
     now = datetime.now(timezone.utc)
-    cutoff = now - timedelta(hours=24)
+    cutoff = now - timedelta(hours=72)
     
     count = 0
     processed_count = 0
@@ -171,7 +171,7 @@ def process_feed(source, feed_url):
         processed_count += 1
         
     if processed_count == 0:
-        print("  NO RECENT ENTRIES: Entries exist, but none published in the last 24 hours.")
+        print("  NO RECENT ENTRIES: Entries exist, but none published in the last 72 hours.")
 
 def main():
     print("FeedToRead RSS/Blog Pipeline")

@@ -95,19 +95,7 @@ import os
 from pathlib import Path
 from fastapi import BackgroundTasks
 
-def run_youtube_extractor():
-    """Background task to run the youtube extractor pipeline."""
-    backend_dir = Path(__file__).parent.parent.resolve()
-    script_path = backend_dir / "youtube_extractor" / "main.py"
-    try:
-        subprocess.Popen(
-            [sys.executable, str(script_path)],
-            cwd=str(backend_dir.parent),
-            env=dict(os.environ, PYTHONPATH=str(backend_dir))
-        )
-        print("[Auto-Trigger] Spawned youtube_extractor/main.py in background")
-    except Exception as e:
-        print(f"[Auto-Trigger] Failed to start youtube_extractor: {e}")
+from api.utils_extractor import trigger_extractors
 
 @router.post("", status_code=201)
 async def add_source(body: SourceBody, background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user)):
@@ -132,7 +120,7 @@ async def add_source(body: SourceBody, background_tasks: BackgroundTasks, curren
         existing.isActive = True
         await existing.save()
         if clean_type == "YOUTUBE":
-            background_tasks.add_task(run_youtube_extractor)
+            background_tasks.add_task(trigger_extractors)
         return {"source": existing.to_frontend_dict()}
     else:
         source = Source(
@@ -143,7 +131,7 @@ async def add_source(body: SourceBody, background_tasks: BackgroundTasks, curren
         )
         await source.insert()
         if clean_type == "YOUTUBE":
-            background_tasks.add_task(run_youtube_extractor)
+            background_tasks.add_task(trigger_extractors)
         return {"source": source.to_frontend_dict()}
 
 

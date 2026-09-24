@@ -149,19 +149,7 @@ import sys
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 
-def run_youtube_extractor():
-    """Background task to run the youtube extractor pipeline."""
-    backend_dir = Path(__file__).parent.parent.resolve()
-    script_path = backend_dir / "youtube_extractor" / "main.py"
-    try:
-        subprocess.Popen(
-            [sys.executable, str(script_path)],
-            cwd=str(backend_dir.parent),
-            env=dict(os.environ, PYTHONPATH=str(backend_dir))
-        )
-        print("[Auto-Trigger] Spawned youtube_extractor/main.py in background")
-    except Exception as e:
-        print(f"[Auto-Trigger] Failed to start youtube_extractor: {e}")
+from api.utils_extractor import trigger_extractors
 
 @router.post("/login", status_code=200)
 async def login(body: LoginBody, background_tasks: BackgroundTasks):
@@ -185,7 +173,7 @@ async def login(body: LoginBody, background_tasks: BackgroundTasks):
         Source.isActive == True
     )
     if has_youtube:
-        background_tasks.add_task(run_youtube_extractor)
+        background_tasks.add_task(trigger_extractors)
         
     return _user_response(user, token)
 
