@@ -1,4 +1,5 @@
 import os
+PORT = os.environ.get("PORT", "8000")
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 import requests
 import warnings
@@ -230,7 +231,7 @@ def process_video(video_id):
     try:
         from ingest_bridge import ingest_video
         print("\nTriggering auto-ingestion pipeline...")
-        ingest_video(video_id, "http://localhost:8000/ingest")
+        ingest_video(video_id, f"http://localhost:{PORT}/ingest")
     except ImportError:
         print("\nCould not import ingest_bridge.py for auto-ingestion.")
     except Exception as err:

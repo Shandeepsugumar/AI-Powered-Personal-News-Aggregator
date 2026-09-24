@@ -1,4 +1,5 @@
 import os
+PORT = os.environ.get("PORT", "8000")
 import sys
 import requests
 import feedparser
@@ -6,8 +7,8 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urljoin
 
-INGEST_URL = "http://localhost:8000/ingest"
-SOURCES_API = "http://localhost:8000/api/sources/active-targets"
+INGEST_URL = f"http://localhost:{PORT}/ingest"
+SOURCES_API = f"http://localhost:{PORT}/api/sources/active-targets"
 
 KNOWN_FEEDS = {
     "the hindu": "https://www.thehindu.com/feeder/default/rss/homepage/",

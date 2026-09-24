@@ -12,13 +12,14 @@ Usage:
     python ingest_bridge.py yz_RwdHplNk --force
 
     # Point at a different server:
-    python ingest_bridge.py --server http://localhost:8000
+    python ingest_bridge.py --server http://localhost:{PORT}
 
 The script tracks already-sent video IDs in ingested.txt so re-running never
 double-posts the same content.
 """
 
 import os
+PORT = os.environ.get("PORT", "8000")
 import sys
 import json
 import argparse
@@ -27,7 +28,7 @@ from datetime import datetime, timezone
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 
-INGEST_URL = "http://localhost:8000/ingest"
+INGEST_URL = f"http://localhost:{PORT}/ingest"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 MARKER_FILE = os.path.join(SCRIPT_DIR, "ingested.txt")
 
