@@ -422,5 +422,16 @@ def retry_failed(db: Session = Depends(get_db)):
 
 @app.get("/")
 @app.get("/health")
+
+@app.get("/debug")
+def debug():
+    try:
+        db = next(get_db())
+        count = db.query(ContentItem).count()
+        return {"status": "ok", "db_count": count}
+    except Exception as e:
+        import traceback
+        return {"status": "error", "trace": traceback.format_exc()}
+
 def health():
     return {"status": "ok"}
