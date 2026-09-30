@@ -76,6 +76,10 @@ class StorySource(Base):
     source_name = Column(String, nullable=False)
     source_url = Column(String, nullable=False)
     source_type = Column(String, nullable=False)
+    
+    is_new_contribution = Column(Boolean, default=False)
+    emailed = Column(Boolean, default=False)
+
 
     group = relationship("StoryGroup", back_populates="sources")
 

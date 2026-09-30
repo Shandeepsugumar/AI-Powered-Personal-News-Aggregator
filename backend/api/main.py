@@ -15,6 +15,8 @@ from ai_agent.ai_service import summarize_content, generate_embedding, merge_dec
 from utils.ranking import recompute_importance_ranking
 from db.mongo_db import init_mongo, close_mongo
 from db.mongo_models import User, Source, Edition, UserStoryStatusMongo
+from utils.scheduler import start_scheduler
+
 from api.mongo_auth import router as auth_router
 from api.mongo_sources import router as sources_router
 from api.mongo_newspaper import router as mongo_newspaper_router
@@ -51,8 +53,8 @@ app.include_router(mongo_newspaper_router)
 
 @app.on_event("startup")
 async def startup_event():
-    # Existing: check AI models available (sync — run in threadpool implicitly)
     check_models_available()
+    start_scheduler()
     # New: connect to MongoDB Atlas and initialise Beanie
     await init_mongo([User, Source, Edition, UserStoryStatusMongo])
 
@@ -251,13 +253,27 @@ def ingest_endpoint(req: IngestRequest, db: Session = Depends(get_db)):
             db.add(final_group)
             db.flush()
         
+        # Determine if genuinely new
+        is_new_info = False
+        if decision in ("new_group", "separate"):
+            is_new_info = True
+        elif decision == "merge" and final_group:
+            if llm2_res.get("has_conflict", False):
+                is_new_info = True
+            else:
+                existing_sources = [s.source_name for s in final_group.sources]
+                if content_item.source_name not in existing_sources:
+                    is_new_info = True
+
         # Link source
         story_source = StorySource(
             story_id=final_group.id,
             content_id=content_item.id,
             source_name=content_item.source_name,
             source_url=content_item.source_url,
-            source_type=content_item.source_type
+            source_type=content_item.source_type,
+            is_new_contribution=is_new_info,
+            emailed=False
         )
         db.add(story_source)
         db.flush()
@@ -409,12 +425,25 @@ def retry_failed(db: Session = Depends(get_db)):
             db.add(final_group)
             db.flush()
             
+        is_new_info = False
+        if decision in ("new_group", "separate"):
+            is_new_info = True
+        elif decision == "merge" and final_group:
+            if llm2_res.get("has_conflict", False):
+                is_new_info = True
+            else:
+                existing_sources = [s.source_name for s in final_group.sources]
+                if item.source_name not in existing_sources:
+                    is_new_info = True
+
         story_source = StorySource(
             story_id=final_group.id,
             content_id=item.id,
             source_name=item.source_name,
             source_url=item.source_url,
-            source_type=item.source_type
+            source_type=item.source_type,
+            is_new_contribution=is_new_info,
+            emailed=False
         )
         db.add(story_source)
         

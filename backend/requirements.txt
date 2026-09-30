@@ -16,3 +16,4 @@ bcrypt
 passlib
 python-jose
 google-generativeai
+APScheduler==3.11.3
