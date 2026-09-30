@@ -46,15 +46,16 @@ class SourceBody(BaseModel):
 # ── Routes ───────────────────────────────────────────────────────────────────
 
 @router.get("/active-targets")
-async def active_targets(type: Optional[str] = Query(default=None)):
+async def active_targets(type: Optional[str] = Query(default=None), user_id: Optional[str] = Query(default=None)):
     """
     Public endpoint — returns aggregated active source targets.
     Used by the YouTube extraction pipeline to know which channels to scrape.
-    Mirrors the MongoDB aggregate in sources.js.
     """
     filter_query: dict = {"isActive": True}
     if type:
         filter_query["sourceType"] = type.upper()
+    if user_id:
+        filter_query["userId"] = PydanticObjectId(user_id)
 
     pipeline = [
         {"$match": filter_query},

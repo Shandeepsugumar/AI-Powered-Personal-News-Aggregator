@@ -22,7 +22,11 @@ API_KEY = os.environ.get("YOUTUBE_API_KEY")
 
 def fetch_active_channels():
     try:
-        response = requests.get(f"http://localhost:{PORT}/api/sources/active-targets?type=YOUTUBE", timeout=10)
+        url = f"http://localhost:{PORT}/api/sources/active-targets?type=YOUTUBE"
+        user_id = os.environ.get("USER_ID")
+        if user_id:
+            url += f"&user_id={user_id}"
+        response = requests.get(url, timeout=10)
         response.raise_for_status()
         data = response.json()
         return [target["sourceName"] for target in data.get("targets", [])]

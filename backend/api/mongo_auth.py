@@ -152,7 +152,7 @@ from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from api.utils_extractor import trigger_extractors
 
 @router.post("/login", status_code=200)
-async def login(body: LoginBody, background_tasks: BackgroundTasks):
+async def login(body: LoginBody):
     if not body.email or not body.password:
         raise HTTPException(status_code=400, detail="Email and password are required.")
 
@@ -166,15 +166,6 @@ async def login(body: LoginBody, background_tasks: BackgroundTasks):
 
     token = _generate_token(str(user.id))
     
-    # Auto-trigger youtube extractor if user has wired YOUTUBE sources
-    has_youtube = await Source.find_one(
-        Source.userId == user.id,
-        Source.sourceType == "YOUTUBE",
-        Source.isActive == True
-    )
-    if has_youtube:
-        background_tasks.add_task(trigger_extractors)
-        
     return _user_response(user, token)
 
 

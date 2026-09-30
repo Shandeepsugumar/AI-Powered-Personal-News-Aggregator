@@ -19,9 +19,13 @@ KNOWN_FEEDS = {
 
 def fetch_active_sources():
     sources = []
+    user_id = os.environ.get("USER_ID")
     try:
         for stype in ["BLOG", "NEWSLETTER", "RSS"]:
-            resp = requests.get(f"{SOURCES_API}?type={stype}", timeout=10)
+            url = f"{SOURCES_API}?type={stype}"
+            if user_id:
+                url += f"&user_id={user_id}"
+            resp = requests.get(url, timeout=10)
             if resp.status_code == 200:
                 targets = resp.json().get("targets", [])
                 sources.extend(targets)

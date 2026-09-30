@@ -20,7 +20,22 @@ from beanie import PydanticObjectId
 
 from db.mongo_models import Edition, Story, StorySource, User
 from api.mongo_auth import get_current_user
+import subprocess
+import sys
+from pathlib import Path
 from api.utils_extractor import trigger_extractors
+
+def run_extractors_sync(user_id_str: str):
+    backend_dir = Path(__file__).parent.parent.resolve()
+    yt_script = backend_dir / "youtube_extractor" / "main.py"
+    rss_script = backend_dir / "rss_extractor" / "main.py"
+    
+    env = dict(os.environ, PYTHONPATH=str(backend_dir), USER_ID=user_id_str)
+    print(f"Running extractors synchronously for user {user_id_str}...")
+    subprocess.run([sys.executable, str(yt_script)], cwd=str(backend_dir), env=env)
+    subprocess.run([sys.executable, str(rss_script)], cwd=str(backend_dir), env=env)
+    print("Extractors finished.")
+
 from datetime import datetime, timezone
 from typing import List, Optional
 from db.database import SessionLocal, StoryGroup
@@ -167,7 +182,6 @@ async def get_latest(current_user: User = Depends(get_current_user)):
     Return the latest edition for today.
     If none exists, auto-create Edition #1 (mirrors Node behaviour exactly).
     """
-    background_tasks.add_task(trigger_extractors)
     today = _local_date_string()
     todays_editions = await Edition.find(
         Edition.userId == current_user.id,
@@ -194,12 +208,14 @@ async def get_latest(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/refresh")
-async def refresh(background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user)):
+async def refresh(current_user: User = Depends(get_current_user)):
     """
     Generate a new edition with deduplicated stories.
     Returns {isNew, edition, message} - mirrors Node behaviour exactly.
     """
-    background_tasks.add_task(trigger_extractors)
+    # Run extractors synchronously scoped to this user only
+    run_extractors_sync(str(current_user.id))
+
     today = _local_date_string()
     now = datetime.utcnow()
 
