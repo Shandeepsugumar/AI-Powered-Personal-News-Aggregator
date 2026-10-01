@@ -72,6 +72,22 @@ def resolve_feed_url(source_name):
             
     return None
 
+def get_image_url(entry, html_soup=None):
+    # Try entry media_content
+    if hasattr(entry, 'media_content'):
+        for m in entry.media_content:
+            if 'url' in m: return m['url']
+    # Try entry enclosures
+    if hasattr(entry, 'enclosures'):
+        for e in entry.enclosures:
+            if 'type' in e and e['type'].startswith('image'): return e['href']
+    # Try og:image from soup
+    if html_soup:
+        og_img = html_soup.find("meta", property="og:image")
+        if og_img and og_img.get("content"):
+            return og_img["content"]
+    return None
+
 def fetch_full_article(url):
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
@@ -79,14 +95,22 @@ def fetch_full_article(url):
         resp.raise_for_status()
         soup = BeautifulSoup(resp.content, "html.parser")
         
+        image_url = None
+        og_img = soup.find("meta", property="og:image")
+        if og_img and og_img.get("content"):
+            image_url = og_img["content"]
+        
         for element in soup(["script", "style", "nav", "footer", "header", "aside", "form"]):
             element.decompose()
             
-        text = soup.get_text(separator="\n", strip=True)
-        return "\n".join([line.strip() for line in text.split("\n") if line.strip()])
+        text = soup.get_text(separator="
+", strip=True)
+        return "
+".join([line.strip() for line in text.split("
+") if line.strip()]), image_url
     except Exception as e:
         print(f"    Failed to fetch full article from {url}: {e}")
-        return ""
+        return "", None
 
 def process_feed(source, feed_url):
     print(f"Fetching feed: {feed_url}")
@@ -137,27 +161,51 @@ def process_feed(source, feed_url):
         elif hasattr(entry, "summary"):
             content_html = entry.summary
             
-        text_content = BeautifulSoup(content_html, "html.parser").get_text(separator="\n", strip=True)
+        text_content = BeautifulSoup(content_html, "html.parser").get_text(separator="
+", strip=True)
+        
+        image_url = None
+        
+        # Check media content or enclosures in the feed
+        if hasattr(entry, 'media_content'):
+            for m in entry.media_content:
+                if 'url' in m:
+                    image_url = m['url']
+                    break
+        if not image_url and hasattr(entry, 'enclosures'):
+            for e in entry.enclosures:
+                if 'type' in e and getattr(e, 'type', '').startswith('image'):
+                    image_url = e.get('href')
+                    break
         
         if len(text_content) < 500:
             print(f"  [FALLBACK PATH] Content too short ({len(text_content)} chars). Fetching full article: {link}")
-            text_content = fetch_full_article(link)
+            text_content, scraped_img = fetch_full_article(link)
+            if not image_url and scraped_img:
+                image_url = scraped_img
         else:
             print(f"  [DIRECT PATH] Using feed content directly ({len(text_content)} chars).")
+            # If direct path has no image, still fetch article just for the og:image metadata (cheap get request without parsing all text if we just want soup)
+            if not image_url:
+                _, scraped_img = fetch_full_article(link)
+                if scraped_img:
+                    image_url = scraped_img
             
         if len(text_content) < 200:
             print(f"  Skipping '{title}' - not enough meaningful content.")
             continue
             
         payload = {
-            "source_type": source["sourceType"].lower(),
+            "source_type": source["sourceType"],
             "source_name": source["sourceName"],
             "source_url": link,
             "title": title,
             "content": text_content,
-            "published_at": published_dt.isoformat() if published_dt else now.isoformat(),
-            "fetched_at": now.isoformat()
+            "published_at": published_dt.isoformat() if published_dt else None,
+            "fetched_at": now.isoformat(),
+            "image_url": image_url
         }
+
         
         print(f"  POSTing '{title}' to /ingest...")
         try:

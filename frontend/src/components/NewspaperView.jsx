@@ -363,6 +363,15 @@ export default function NewspaperView({ stories, followedSources = [], isLoading
                     )}
                   </h4>
 
+                  {story.imageUrl && (
+                    <img
+                      src={story.imageUrl}
+                      alt=""
+                      className="w-full h-32 object-cover grayscale contrast-125 sepia-[0.15] mb-3 border border-stone-400 p-0.5"
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    />
+                  )}
+
                   <p className="text-[#383531] text-sm font-editorial-body leading-relaxed mb-4 text-justify">
                     {story.summary}
                   </p>

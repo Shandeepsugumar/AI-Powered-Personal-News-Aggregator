@@ -74,6 +74,7 @@ def fetch_metadata_via_ytdlp(video_id):
         meta = {
             "video_id": video_id,
             "title": info.get("title", ""),
+            "thumbnail": info.get("thumbnail"),
             "channel_name": info.get("uploader") or info.get("channel", ""),
             "published_at": published_at,
             "url": url,
@@ -91,6 +92,7 @@ def fetch_metadata_via_ytdlp(video_id):
     return {
         "video_id": video_id,
         "title": "",
+        "thumbnail": None,
         "channel_name": "YouTube",
         "published_at": None,
         "url": f"https://www.youtube.com/watch?v={video_id}",
@@ -120,10 +122,22 @@ def load_transcript(video_id):
 def build_payload(video_id, transcript, meta, force=False):
     """Build the exact /ingest payload from transcript + sidecar metadata."""
     fetched_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    
+    image_url = meta.get("thumbnail")
+    if not image_url:
+        image_url = f"https://i.ytimg.com/vi/{video_id}/maxresdefault.jpg"
+        
     return {
         "source_type": "youtube",
         "source_name": meta.get("channel_name") or "YouTube",
         "source_url": meta.get("url") or f"https://www.youtube.com/watch?v={video_id}",
+        "title": meta.get("title") or video_id,
+        "content": transcript,
+        "published_at": meta.get("published_at"),
+        "fetched_at": fetched_at,
+        "image_url": image_url,
+        "force": force,
+    }",
         "title": meta.get("title") or video_id,
         "content": transcript,
         "published_at": meta.get("published_at"),

@@ -67,6 +67,7 @@ class IngestRequest(BaseModel):
     source_url: str
     title: Optional[str] = None
     content: str
+    image_url: Optional[str] = None
     published_at: Optional[str] = None
     fetched_at: Optional[str] = None
     force: Optional[bool] = False
@@ -100,6 +101,7 @@ async def ingest_endpoint(req: IngestRequest):
             source_url=req.source_url,
             title=req.title,
             raw_content=cleaned_content,
+            image_url=req.image_url,
             content_hash=content_hash,
             published_at=pub_at,
             fetched_at=fetch_at
@@ -227,6 +229,8 @@ async def ingest_endpoint(req: IngestRequest):
             final_group.summary = llm2_res.get("final_summary", final_group.summary)
             final_group.category = llm2_res.get("category", final_group.category)
             final_group.stance = llm2_res.get("stance", final_group.stance)
+            if not final_group.image_url and content_item.image_url:
+                final_group.image_url = content_item.image_url
             final_group.updated_at = now
         
             new_grp_emb = await run_in_threadpool(generate_embedding, f"{final_group.headline} {final_group.summary}")
@@ -245,6 +249,7 @@ async def ingest_endpoint(req: IngestRequest):
                 summary=llm2_res.get("final_summary", summary_item.summary),
                 category=llm2_res.get("category", summary_item.category),
                 stance=llm2_res.get("stance", "NEUTRAL"),
+                image_url=content_item.image_url,
                 embedding=new_embedding
             )
             await final_group.insert()

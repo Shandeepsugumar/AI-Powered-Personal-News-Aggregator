@@ -225,7 +225,7 @@ async def _get_live_stories(edition_number: int = 1, now: Optional[datetime] = N
                     stance=stance_str,
                     importance=importance,
                     summary=group.summary,
-                    imageUrl=None,
+                    imageUrl=group.image_url,
                     sources=sources,
                     timestamp=group.created_at or now,
                     is_new=True

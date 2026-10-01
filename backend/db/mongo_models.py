@@ -22,6 +22,7 @@ class Story(BaseModel):
     id: str
     headline: str
     category: str
+    image_url: Optional[str] = None
     stance: str = "Neutral"
     importance: str = "minor"  # lead | major | minor
     summary: str
@@ -98,6 +99,7 @@ class ContentItemMongo(Document):
     source_url: str
     title: Optional[str] = None
     raw_content: str
+    image_url: Optional[str] = None
     content_hash: str
     published_at: Optional[datetime] = None
     fetched_at: datetime = Field(default_factory=datetime.utcnow)
@@ -111,6 +113,7 @@ class SummaryItemMongo(Document):
     headline: str
     summary: str
     category: str
+    image_url: Optional[str] = None
     is_news: bool = True
     event: Optional[str] = None
     stance: Optional[str] = None
@@ -123,6 +126,7 @@ class StoryGroupMongo(Document):
     headline: str
     summary: str
     category: str
+    image_url: Optional[str] = None
     stance: Optional[str] = None
     importance: Optional[str] = None
     embedding: Optional[List[float]] = None
