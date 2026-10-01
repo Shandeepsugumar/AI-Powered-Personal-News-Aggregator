@@ -46,13 +46,14 @@ export default function NewspaperView({ stories, followedSources = [], isLoading
 
   // Stance indicator styled as printed wax / rubber stamp tag
   const renderStancePill = (stance) => {
+    let cleanStance = (stance || 'Neutral').replace(/STANCE/gi, '').trim();
     let stampColor = "border-stone-700 text-stone-800 bg-stone-100/40";
-    if (stance === 'Positive') stampColor = "border-emerald-800 text-emerald-950 bg-emerald-50/60";
-    if (stance === 'Negative') stampColor = "border-amber-900 text-amber-950 bg-amber-50/60";
+    if (cleanStance.toLowerCase() === 'positive') stampColor = "border-emerald-800 text-emerald-950 bg-emerald-50/60";
+    if (cleanStance.toLowerCase() === 'negative') stampColor = "border-amber-900 text-amber-950 bg-amber-50/60";
 
     return (
       <span className={`text-[10px] font-mono uppercase tracking-wider font-bold px-1.5 py-0.5 border shadow-[1px_1px_0px_rgba(0,0,0,0.1)] ${stampColor}`}>
-        [{stance} Stance]
+        [{cleanStance} Stance]
       </span>
     );
   };
@@ -222,21 +223,34 @@ export default function NewspaperView({ stories, followedSources = [], isLoading
                 )}
               </h2>
 
-              {/* Lead Story Image */}
+              {/* Lead Story Image / Video */}
               {leadStory.imageUrl && (
                 <div className="my-4 border border-stone-800 p-1 bg-stone-100/60 shadow-inner">
-                  <div className="relative overflow-hidden max-h-96">
+                  <a
+                    href={leadStory.sources?.[0]?.url || "#"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="relative block overflow-hidden max-h-96 group cursor-pointer"
+                  >
                     <img
                       src={leadStory.imageUrl}
                       alt={leadStory.headline}
-                      className="w-full h-full object-cover grayscale contrast-125 sepia-[0.20] hover:grayscale-0 transition-all duration-500"
+                      className="w-full h-full object-cover grayscale contrast-125 sepia-[0.20] group-hover:grayscale-0 group-hover:scale-[1.01] transition-all duration-500"
                       onError={(e) => {
                         e.currentTarget.parentElement.parentElement.style.display = 'none';
                       }}
                     />
-                  </div>
+                    {(leadStory.sources?.[0]?.type === 'YOUTUBE' || leadStory.sources?.[0]?.url?.includes('youtube.com')) && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/25 group-hover:bg-black/10 transition-colors">
+                        <div className="bg-[#1C1A17]/90 text-white border-2 border-stone-200 px-4 py-2 flex items-center gap-2 shadow-2xl group-hover:bg-red-700 group-hover:border-white transition-all transform group-hover:scale-105">
+                          <span className="text-base font-bold text-red-500 group-hover:text-white">▶</span>
+                          <span className="text-[11px] font-ticker font-bold tracking-widest uppercase">Watch Video on YouTube</span>
+                        </div>
+                      </div>
+                    )}
+                  </a>
                   <figcaption className="text-[10px] font-mono uppercase tracking-widest text-stone-600 mt-1.5 flex justify-between px-1">
-                    <span>Plate No. 1 · Wire Photogram</span>
+                    <span>{leadStory.sources?.[0]?.type === 'YOUTUBE' ? 'Plate No. 1 · Motion Picture Dispatch' : 'Plate No. 1 · Wire Photogram'}</span>
                     <span>Source: {leadStory.sources?.[0]?.name || 'Press Bureau'}</span>
                   </figcaption>
                 </div>
@@ -296,12 +310,24 @@ export default function NewspaperView({ stories, followedSources = [], isLoading
                 </h4>
 
                 {story.imageUrl && (
-                  <img
-                    src={story.imageUrl}
-                    alt=""
-                    className="w-16 h-16 object-cover grayscale contrast-125 sepia-[0.15] float-right ml-3 mb-2 border border-stone-400 p-0.5"
-                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                  />
+                  <a
+                    href={story.sources?.[0]?.url || "#"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="relative float-right ml-3 mb-2 group block"
+                  >
+                    <img
+                      src={story.imageUrl}
+                      alt=""
+                      className="w-16 h-16 object-cover grayscale contrast-125 sepia-[0.15] group-hover:grayscale-0 border border-stone-400 p-0.5 transition-all"
+                      onError={(e) => { e.currentTarget.parentElement.style.display = 'none'; }}
+                    />
+                    {(story.sources?.[0]?.type === 'YOUTUBE' || story.sources?.[0]?.url?.includes('youtube.com')) && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/25 group-hover:bg-black/10 transition-colors">
+                        <span className="bg-red-700 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] shadow">▶</span>
+                      </div>
+                    )}
+                  </a>
                 )}
 
                 <p className="text-[#383531] text-xs sm:text-sm font-editorial-body leading-relaxed mb-3 text-justify">
@@ -364,12 +390,27 @@ export default function NewspaperView({ stories, followedSources = [], isLoading
                   </h4>
 
                   {story.imageUrl && (
-                    <img
-                      src={story.imageUrl}
-                      alt=""
-                      className="w-full h-32 object-cover grayscale contrast-125 sepia-[0.15] mb-3 border border-stone-400 p-0.5"
-                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                    />
+                    <a
+                      href={story.sources?.[0]?.url || "#"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="relative block mb-3 group"
+                    >
+                      <img
+                        src={story.imageUrl}
+                        alt=""
+                        className="w-full h-36 object-cover grayscale contrast-125 sepia-[0.15] group-hover:grayscale-0 border border-stone-400 p-0.5 transition-all"
+                        onError={(e) => { e.currentTarget.parentElement.style.display = 'none'; }}
+                      />
+                      {(story.sources?.[0]?.type === 'YOUTUBE' || story.sources?.[0]?.url?.includes('youtube.com')) && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/25 group-hover:bg-black/10 transition-colors">
+                          <div className="bg-[#1C1A17]/90 text-white border border-stone-300 px-3 py-1 flex items-center gap-1.5 shadow group-hover:bg-red-700 transition-all">
+                            <span className="text-xs text-red-500 group-hover:text-white">▶</span>
+                            <span className="text-[10px] font-ticker font-bold tracking-wider uppercase">Watch on YouTube</span>
+                          </div>
+                        </div>
+                      )}
+                    </a>
                   )}
 
                   <p className="text-[#383531] text-sm font-editorial-body leading-relaxed mb-4 text-justify">

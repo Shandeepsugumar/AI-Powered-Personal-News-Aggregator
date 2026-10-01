@@ -338,8 +338,7 @@ export default function App() {
   });
 
   return (
-    <div className=
-
+    <div className="min-h-screen bg-[#F8F5EE] text-[#1C1A17] font-editorial-body flex flex-col selection:bg-[#262624] selection:text-[#F8F5EE]">
       {isStreaming && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="bg-[#1C1A17] w-full max-w-2xl rounded-sm border border-stone-700 shadow-2xl flex flex-col overflow-hidden">
@@ -360,7 +359,6 @@ export default function App() {
           </div>
         </div>
       )}
-"min-h-screen bg-[#F8F5EE] text-[#1C1A17] font-editorial-body flex flex-col selection:bg-[#262624] selection:text-[#F8F5EE]">
       <div className="flex-1">
         <Masthead
           user={user}

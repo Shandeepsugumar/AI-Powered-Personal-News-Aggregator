@@ -1,6 +1,9 @@
 import os
 PORT = os.environ.get("PORT", "8000")
+import sys
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, SCRIPT_DIR)
 import requests
 import warnings
 import time
@@ -263,11 +266,12 @@ def process_video(video_id):
         
         # NEW: Auto-trigger ingestion
         try:
-            from ingest_bridge import ingest_video
+            try:
+                from youtube_extractor.ingest_bridge import ingest_video
+            except ImportError:
+                from ingest_bridge import ingest_video
             print("\nTriggering auto-ingestion pipeline...")
             ingest_video(video_id, f"http://localhost:{PORT}/ingest")
-        except ImportError:
-            print("\nCould not import ingest_bridge.py for auto-ingestion.")
         except Exception as err:
             print(f"\nFailed to auto-ingest {video_id}: {err}")
         return
@@ -289,11 +293,12 @@ def process_video(video_id):
     
     # NEW: Auto-trigger ingestion
     try:
-        from ingest_bridge import ingest_video
+        try:
+            from youtube_extractor.ingest_bridge import ingest_video
+        except ImportError:
+            from ingest_bridge import ingest_video
         print("\nTriggering auto-ingestion pipeline...")
         ingest_video(video_id, f"http://localhost:{PORT}/ingest")
-    except ImportError:
-        print("\nCould not import ingest_bridge.py for auto-ingestion.")
     except Exception as err:
         print(f"\nFailed to auto-ingest {video_id}: {err}")
 
