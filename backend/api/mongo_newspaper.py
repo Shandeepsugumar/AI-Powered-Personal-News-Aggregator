@@ -16,11 +16,12 @@ from datetime import datetime, timezone
 from typing import Optional, List
 
 from starlette.concurrency import run_in_threadpool
-from fastapi import APIRouter
-
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Query
 from fastapi.responses import StreamingResponse
 import asyncio
 from typing import AsyncGenerator
+
+router = APIRouter(prefix="/api/newspaper", tags=["newspaper"])
 
 async def _stream_extractors(user_id_str: str) -> AsyncGenerator[str, None]:
     import subprocess
@@ -28,7 +29,8 @@ async def _stream_extractors(user_id_str: str) -> AsyncGenerator[str, None]:
     from pathlib import Path
     import os
     
-    yield "data: {"type": "log", "message": "Starting extraction process..."}\n\n"
+    import json
+    yield f"data: {json.dumps({'type': 'log', 'message': 'Starting extraction process...'})}\n\n"
     
     backend_dir = Path(__file__).parent.parent.resolve()
     yt_script = backend_dir / "youtube_extractor" / "main.py"
@@ -36,23 +38,21 @@ async def _stream_extractors(user_id_str: str) -> AsyncGenerator[str, None]:
     
     env = dict(os.environ, PYTHONPATH=str(backend_dir), USER_ID=user_id_str, PYTHONUNBUFFERED="1")
     
-    yield "data: {"type": "log", "message": "Running YouTube extractor..."}\n\n"
+    yield f"data: {json.dumps({'type': 'log', 'message': 'Running YouTube extractor...'})}\n\n"
     process_yt = subprocess.Popen([sys.executable, str(yt_script)], cwd=str(backend_dir), env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     for line in process_yt.stdout:
-        import json
         yield f"data: {json.dumps({'type': 'log', 'message': line.strip()})}\n\n"
         await asyncio.sleep(0.01)
     process_yt.wait()
 
-    yield "data: {"type": "log", "message": "Running RSS/Blog extractor..."}\n\n"
+    yield f"data: {json.dumps({'type': 'log', 'message': 'Running RSS/Blog extractor...'})}\n\n"
     process_rss = subprocess.Popen([sys.executable, str(rss_script)], cwd=str(backend_dir), env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     for line in process_rss.stdout:
-        import json
         yield f"data: {json.dumps({'type': 'log', 'message': line.strip()})}\n\n"
         await asyncio.sleep(0.01)
     process_rss.wait()
 
-    yield "data: {"type": "log", "message": "Extraction finished. Compiling edition..."}\n\n"
+    yield f"data: {json.dumps({'type': 'log', 'message': 'Extraction finished. Compiling edition...'})}\n\n"
     
 @router.get("/stream-refresh")
 async def stream_refresh(token: str):
@@ -124,7 +124,6 @@ async def stream_refresh(token: str):
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
             
     return StreamingResponse(event_generator(), media_type="text/event-stream")
-, HTTPException, Depends, BackgroundTasks, Query
 from beanie import PydanticObjectId
 
 from db.mongo_models import Edition, Story, StorySource, User

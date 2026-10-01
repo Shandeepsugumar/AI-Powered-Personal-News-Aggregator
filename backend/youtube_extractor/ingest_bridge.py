@@ -137,12 +137,6 @@ def build_payload(video_id, transcript, meta, force=False):
         "fetched_at": fetched_at,
         "image_url": image_url,
         "force": force,
-    }",
-        "title": meta.get("title") or video_id,
-        "content": transcript,
-        "published_at": meta.get("published_at"),
-        "fetched_at": fetched_at,
-        "force": force,
     }
 
 

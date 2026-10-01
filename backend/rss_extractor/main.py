@@ -103,11 +103,8 @@ def fetch_full_article(url):
         for element in soup(["script", "style", "nav", "footer", "header", "aside", "form"]):
             element.decompose()
             
-        text = soup.get_text(separator="
-", strip=True)
-        return "
-".join([line.strip() for line in text.split("
-") if line.strip()]), image_url
+        text = soup.get_text(separator="\n", strip=True)
+        return "\n".join([line.strip() for line in text.split("\n") if line.strip()]), image_url
     except Exception as e:
         print(f"    Failed to fetch full article from {url}: {e}")
         return "", None
@@ -161,8 +158,7 @@ def process_feed(source, feed_url):
         elif hasattr(entry, "summary"):
             content_html = entry.summary
             
-        text_content = BeautifulSoup(content_html, "html.parser").get_text(separator="
-", strip=True)
+        text_content = BeautifulSoup(content_html, "html.parser").get_text(separator="\n", strip=True)
         
         image_url = None
         

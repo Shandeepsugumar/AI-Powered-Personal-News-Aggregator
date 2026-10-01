@@ -143,13 +143,11 @@ async def ingest_endpoint(req: IngestRequest):
         emb_text = f"{summary_item.headline} {summary_item.summary}"
         new_embedding = await run_in_threadpool(generate_embedding, emb_text)
     
-        safe_print("
-========== STAGE: EMBEDDING ==========")
+        safe_print("\n========== STAGE: EMBEDDING ==========")
         safe_print(f"Embedding Item: {summary_item.headline}")
         safe_print(f"Vector Dimensions: {len(new_embedding)} dimensions")
         safe_print(f"Vector Preview: [{', '.join(f'{x:.4f}' for x in new_embedding[:8])}, ...] ({len(new_embedding)} dims)")
-        safe_print("======================================
-")
+        safe_print("======================================\n")
     
         freshness_limit = now - timedelta(hours=48)
         active_groups = await StoryGroupMongo.find(StoryGroupMongo.updated_at >= freshness_limit).to_list()
@@ -166,8 +164,7 @@ async def ingest_endpoint(req: IngestRequest):
                 all_indices = np.argsort(sims)[::-1]
                 top_k_indices = all_indices[:5]
             
-                safe_print("
-========== STAGE: CANDIDATE RETRIEVAL ==========")
+                safe_print("\n========== STAGE: CANDIDATE RETRIEVAL ==========")
                 safe_print(f"New Item: {summary_item.headline}")
                 safe_print(f"Searching against {len(valid_groups)} active stories within the 48h window")
             
@@ -185,8 +182,7 @@ async def ingest_endpoint(req: IngestRequest):
                             "event": "N/A (Group)",
                             "category": g.category
                         })
-                safe_print("================================================
-")
+                safe_print("================================================\n")
                 
         new_item_dict = {
             "id": "new",
@@ -235,13 +231,11 @@ async def ingest_endpoint(req: IngestRequest):
         
             new_grp_emb = await run_in_threadpool(generate_embedding, f"{final_group.headline} {final_group.summary}")
             final_group.embedding = new_grp_emb
-            safe_print("
-========== STAGE: EMBEDDING (GROUP UPDATE) ==========")
+            safe_print("\n========== STAGE: EMBEDDING (GROUP UPDATE) ==========")
             safe_print(f"Embedding Group: {final_group.headline}")
             safe_print(f"Vector Dimensions: {len(new_grp_emb)} dimensions")
             safe_print(f"Vector Preview: [{', '.join(f'{x:.4f}' for x in new_grp_emb[:8])}, ...] ({len(new_grp_emb)} dims)")
-            safe_print("=====================================================
-")
+            safe_print("=====================================================\n")
             await final_group.save()
         else:
             final_group = StoryGroupMongo(

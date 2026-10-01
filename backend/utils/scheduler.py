@@ -1,4 +1,4 @@
-﻿import os
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -53,34 +53,27 @@ async def _run_cycle_async():
     print("[Scheduler] Extractors finished. Sending notifications...")
     await send_notifications(source_to_users)
 
-def await send_notifications(source_to_users):
-    db = SessionLocal()
+async def send_notifications(source_to_users):
     try:
         # Find all un-emailed, genuinely new contributions
-        new_sources = db.query(StorySource).filter(
-            StorySource.is_new_contribution == True,
-            StorySource.emailed == False
-        ).all()
+        new_sources = await StorySourceMongo.find(
+            StorySourceMongo.is_new_contribution == True,
+            StorySourceMongo.emailed == False
+        ).to_list()
         
         if not new_sources:
             print("[Scheduler] No new contributions to notify about.")
             return
             
         # Group new stories by User
-        # user -> list of dicts with story info
         user_notifications = defaultdict(list)
         user_objects = {}
-        
-        # Track which StorySources we process to mark them as emailed later
         processed_source_ids = []
         
-        # A single StoryGroup might have multiple new_sources. We want to notify about the StoryGroup once per user.
-        # But we also want to batch by user.
         for src in new_sources:
             source_name_lower = src.source_name.lower()
             subscribers = source_to_users.get(source_name_lower, set())
             
-            from beanie import PydanticObjectId
             group = await StoryGroupMongo.get(src.story_id)
             if not group:
                 continue
@@ -115,8 +108,6 @@ def await send_notifications(source_to_users):
                 
                 for email, stories in user_notifications.items():
                     user = user_objects[email]
-                    # Deduplicate stories by group_id in case a user is subscribed to multiple sources
-                    # that contributed to the SAME story group
                     unique_stories = {s["group_id"]: s for s in stories}.values()
                     
                     msg = MIMEMultipart("alternative")
@@ -143,11 +134,12 @@ def await send_notifications(source_to_users):
             except Exception as e:
                 print(f"[Scheduler] Failed to send emails: {e}")
                 
-        # Mark as emailed regardless of SMTP success (so we don't retry endlessly if SMTP is broken)
-        # "an email failure must never block or fail the ingestion pipeline; log and continue"
-        if processed_source_ids:
-            db.query(StorySource).filter(StorySource.id.in_(processed_source_ids)).update({"emailed": True}, synchronize_session=False)
-            db.commit()
-            
-    finally:
-        db.close()
+        # Mark as emailed regardless of SMTP success
+        for src_id in processed_source_ids:
+            src = await StorySourceMongo.get(src_id)
+            if src:
+                src.emailed = True
+                await src.save()
+        print(f"[Scheduler] Marked {len(processed_source_ids)} sources as emailed.")
+    except Exception as e:
+        print(f"[Scheduler] Error sending notifications: {e}")
