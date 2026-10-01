@@ -147,8 +147,6 @@ def run_extractors_sync(user_id_str: str):
 from datetime import datetime, timezone
 from typing import List, Optional
 
-router = APIRouter(prefix="/api/newspaper", tags=["newspaper"])
-
 # ── Path to newsletter_stage.json (same relative path as in Node backend) ────
 _BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 STAGE_JSON_PATH = os.path.join(_BACKEND_DIR, "newsletter_service", "newsletter_stage.json")
@@ -306,7 +304,17 @@ async def get_latest(current_user: User = Depends(get_current_user)):
         await current_user.save()
         return _edition_to_dict(first_edition)
 
-    return _edition_to_dict(todays_editions[0])
+    latest_edition = todays_editions[0]
+    has_only_fallback = all(s.id.startswith("story-") for s in latest_edition.stories)
+    if has_only_fallback:
+        from db.mongo_models import StoryGroupMongo
+        if await StoryGroupMongo.count() > 0:
+            live_stories = await _get_live_stories(latest_edition.editionNumber)
+            if not all(s.id.startswith("story-") for s in live_stories):
+                latest_edition.stories = live_stories
+                await latest_edition.save()
+
+    return _edition_to_dict(latest_edition)
 
 
 @router.post("/refresh")

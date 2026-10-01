@@ -158,7 +158,7 @@ async def ingest_endpoint(req: IngestRequest):
             valid_groups = [g for g in active_groups if g.embedding]
         
             if valid_groups:
-                from utils.content_parser import cosine_similarity
+                from sklearn.metrics.pairwise import cosine_similarity
                 import numpy as np
                 sims = cosine_similarity([new_embedding], group_embs)[0]
                 all_indices = np.argsort(sims)[::-1]

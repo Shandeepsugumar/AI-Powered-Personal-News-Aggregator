@@ -77,18 +77,17 @@ def call_openrouter(model: str, system_prompt: str, user_content: str, max_retri
             continue
             
         if resp.status_code != 200:
-            print(f"OpenRouter Error: {resp.text}")
-            return "{}"
+            print(f"OpenRouter Error: {resp.text}. Falling back to Groq...")
+            return call_groq("openai/gpt-oss-120b", system_prompt, user_content)
             
         try:
             content = resp.json()["choices"][0]["message"].get("content")
             return content if content is not None else "{}"
         except (KeyError, IndexError) as e:
-            print(f"OpenRouter response format error: {resp.json()}")
-            return "{}"
+            return call_groq("openai/gpt-oss-120b", system_prompt, user_content)
             
-    print(f"Max retries reached for model {model}.")
-    return "{}"
+    print(f"Max retries reached for OpenRouter model {model}. Falling back to Groq...")
+    return call_groq("openai/gpt-oss-120b", system_prompt, user_content)
 
 def call_groq(model: str, system_prompt: str, user_content: str, max_retries: int = 5) -> str:
     headers = {

@@ -3,7 +3,7 @@ mongo_models.py — Beanie document models mirroring the Mongoose schemas exactl
 Field names match the MongoDB collections created by the Node.js backend.
 """
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Any, Union
 from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field
 
@@ -117,7 +117,7 @@ class SummaryItemMongo(Document):
     is_news: bool = True
     event: Optional[str] = None
     stance: Optional[str] = None
-    key_facts: Optional[dict] = None
+    key_facts: Optional[Any] = None
 
     class Settings:
         name = "summary_items"
