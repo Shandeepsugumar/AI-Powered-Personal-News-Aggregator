@@ -36,7 +36,8 @@ async def _stream_extractors(user_id_str: str) -> AsyncGenerator[str, None]:
     yt_script = backend_dir / "youtube_extractor" / "main.py"
     rss_script = backend_dir / "rss_extractor" / "main.py"
     
-    env = dict(os.environ, PYTHONPATH=str(backend_dir), USER_ID=user_id_str, PYTHONUNBUFFERED="1")
+    port = os.environ.get("PORT", "8000")
+    env = dict(os.environ, PYTHONPATH=str(backend_dir), USER_ID=user_id_str, PYTHONUNBUFFERED="1", PORT=port)
     
     yield f"data: {json.dumps({'type': 'log', 'message': 'Running YouTube extractor...'})}\n\n"
     process_yt = subprocess.Popen([sys.executable, str(yt_script)], cwd=str(backend_dir), env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -138,7 +139,8 @@ def run_extractors_sync(user_id_str: str):
     yt_script = backend_dir / "youtube_extractor" / "main.py"
     rss_script = backend_dir / "rss_extractor" / "main.py"
     
-    env = dict(os.environ, PYTHONPATH=str(backend_dir), USER_ID=user_id_str, PYTHONUNBUFFERED="1")
+    port = os.environ.get("PORT", "8000")
+    env = dict(os.environ, PYTHONPATH=str(backend_dir), USER_ID=user_id_str, PYTHONUNBUFFERED="1", PORT=port)
     print(f"Running extractors synchronously for user {user_id_str}...")
     subprocess.run([sys.executable, str(yt_script)], cwd=str(backend_dir), env=env)
     subprocess.run([sys.executable, str(rss_script)], cwd=str(backend_dir), env=env)

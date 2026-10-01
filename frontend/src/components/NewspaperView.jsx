@@ -14,31 +14,42 @@ function formatTeletypeTime(isoString) {
   }
 }
 
+function getVideoPlayUrl(source) {
+  if (!source?.url) return "#";
+  if (source.type === 'YOUTUBE' || source.url.includes('youtube.com') || source.url.includes('youtu.be')) {
+    const separator = source.url.includes('?') ? '&' : '?';
+    return `${source.url}${separator}autoplay=1`;
+  }
+  return source.url;
+}
+
 export default function NewspaperView({ stories, followedSources = [], isLoading, activeCategory, onResetCategory, onOpenSources }) {
   
   // Format source type badge
   const renderSourceBadge = (source) => {
     let prefix = "📰";
     let typeClass = "border-stone-700 bg-stone-100/80 text-stone-900";
+    const isYt = source.type === 'YOUTUBE' || source.url?.includes('youtube.com');
 
-    if (source.type === 'YOUTUBE') {
+    if (isYt) {
       prefix = "▶";
-      typeClass = "border-red-900/60 bg-red-50/50 text-red-950";
+      typeClass = "border-red-900/60 bg-red-50/50 text-red-950 hover:bg-red-100/80";
     } else if (source.type === 'NEWSLETTER') {
       prefix = "✉";
-      typeClass = "border-amber-900/60 bg-amber-50/50 text-amber-950";
+      typeClass = "border-amber-900/60 bg-amber-50/50 text-amber-950 hover:bg-amber-100/80";
     }
 
     return (
       <a
         key={source.name + source.url}
-        href={source.url}
+        href={getVideoPlayUrl(source)}
         target="_blank"
         rel="noopener noreferrer"
-        className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-ticker border hover:bg-[#EFECE4] transition-colors ${typeClass}`}
+        className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-ticker border transition-colors ${typeClass}`}
       >
         <span>{prefix}</span>
         <span className="font-bold">{source.name}</span>
+        {isYt && <span className="text-[9px] uppercase font-mono tracking-wider text-red-700 font-bold ml-0.5">[PLAY]</span>}
         <ExternalLink className="w-2.5 h-2.5 opacity-60 ml-0.5" />
       </a>
     );
@@ -227,7 +238,7 @@ export default function NewspaperView({ stories, followedSources = [], isLoading
               {leadStory.imageUrl && (
                 <div className="my-4 border border-stone-800 p-1 bg-stone-100/60 shadow-inner">
                   <a
-                    href={leadStory.sources?.[0]?.url || "#"}
+                    href={getVideoPlayUrl(leadStory.sources?.[0])}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="relative block overflow-hidden max-h-96 group cursor-pointer"
@@ -235,16 +246,22 @@ export default function NewspaperView({ stories, followedSources = [], isLoading
                     <img
                       src={leadStory.imageUrl}
                       alt={leadStory.headline}
+                      referrerPolicy="no-referrer"
                       className="w-full h-full object-cover grayscale contrast-125 sepia-[0.20] group-hover:grayscale-0 group-hover:scale-[1.01] transition-all duration-500"
                       onError={(e) => {
-                        e.currentTarget.parentElement.parentElement.style.display = 'none';
+                        if (e.currentTarget.src.includes('maxresdefault')) {
+                          e.currentTarget.src = e.currentTarget.src.replace('maxresdefault', 'hqdefault');
+                        } else {
+                          e.currentTarget.parentElement.parentElement.style.display = 'none';
+                        }
                       }}
                     />
                     {(leadStory.sources?.[0]?.type === 'YOUTUBE' || leadStory.sources?.[0]?.url?.includes('youtube.com')) && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/25 group-hover:bg-black/10 transition-colors">
-                        <div className="bg-[#1C1A17]/90 text-white border-2 border-stone-200 px-4 py-2 flex items-center gap-2 shadow-2xl group-hover:bg-red-700 group-hover:border-white transition-all transform group-hover:scale-105">
-                          <span className="text-base font-bold text-red-500 group-hover:text-white">▶</span>
-                          <span className="text-[11px] font-ticker font-bold tracking-widest uppercase">Watch Video on YouTube</span>
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/25 group-hover:bg-black/35 transition-all">
+                        <div className="w-16 h-16 bg-red-600/90 text-white rounded-full flex items-center justify-center shadow-[0_4px_25px_rgba(0,0,0,0.6)] group-hover:bg-red-600 group-hover:scale-110 transition-all ring-4 ring-white">
+                          <svg className="w-8 h-8 fill-current translate-x-0.5" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z"/>
+                          </svg>
                         </div>
                       </div>
                     )}
@@ -311,20 +328,31 @@ export default function NewspaperView({ stories, followedSources = [], isLoading
 
                 {story.imageUrl && (
                   <a
-                    href={story.sources?.[0]?.url || "#"}
+                    href={getVideoPlayUrl(story.sources?.[0])}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="relative float-right ml-3 mb-2 group block"
+                    className="relative float-right ml-3 mb-2 group block cursor-pointer"
                   >
                     <img
                       src={story.imageUrl}
                       alt=""
-                      className="w-16 h-16 object-cover grayscale contrast-125 sepia-[0.15] group-hover:grayscale-0 border border-stone-400 p-0.5 transition-all"
-                      onError={(e) => { e.currentTarget.parentElement.style.display = 'none'; }}
+                      referrerPolicy="no-referrer"
+                      className="w-20 h-20 object-cover grayscale contrast-125 sepia-[0.15] group-hover:grayscale-0 border border-stone-400 p-0.5 transition-all"
+                      onError={(e) => {
+                        if (e.currentTarget.src.includes('maxresdefault')) {
+                          e.currentTarget.src = e.currentTarget.src.replace('maxresdefault', 'hqdefault');
+                        } else {
+                          e.currentTarget.parentElement.style.display = 'none';
+                        }
+                      }}
                     />
                     {(story.sources?.[0]?.type === 'YOUTUBE' || story.sources?.[0]?.url?.includes('youtube.com')) && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/25 group-hover:bg-black/10 transition-colors">
-                        <span className="bg-red-700 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] shadow">▶</span>
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/25 group-hover:bg-black/35 transition-all">
+                        <div className="w-7 h-7 bg-red-600/90 text-white rounded-full flex items-center justify-center shadow-md group-hover:bg-red-600 group-hover:scale-110 transition-all ring-2 ring-white">
+                          <svg className="w-3.5 h-3.5 fill-current translate-x-0.5" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z"/>
+                          </svg>
+                        </div>
                       </div>
                     )}
                   </a>
@@ -367,9 +395,10 @@ export default function NewspaperView({ stories, followedSources = [], isLoading
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 divide-y md:divide-y-0 md:divide-x divide-[#D5CEC2]">
-            {secondaryStories.map((story, idx) => (
-              <article key={story.id} className={`${idx > 0 ? 'md:pl-6' : ''} pt-6 md:pt-0 flex flex-col justify-between`}>
+          {/* Multi-column masonry layout: seamless columns without vertical holes or grid gaps */}
+          <div className="columns-1 md:columns-2 lg:columns-3 gap-8 [column-fill:_balance]">
+            {secondaryStories.map((story) => (
+              <article key={story.id} className="break-inside-avoid mb-8 pb-6 border-b border-[#D5CEC2] flex flex-col justify-between">
                 <div>
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-[9px] font-ticker font-bold uppercase tracking-wider px-1.5 py-0.5 bg-[#EFECE4] text-[#1C1A17] border border-[#D5CEC2]">
@@ -391,22 +420,30 @@ export default function NewspaperView({ stories, followedSources = [], isLoading
 
                   {story.imageUrl && (
                     <a
-                      href={story.sources?.[0]?.url || "#"}
+                      href={getVideoPlayUrl(story.sources?.[0])}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="relative block mb-3 group"
+                      className="relative block mb-3 group cursor-pointer overflow-hidden border border-stone-400 p-0.5 bg-stone-100"
                     >
                       <img
                         src={story.imageUrl}
                         alt=""
-                        className="w-full h-36 object-cover grayscale contrast-125 sepia-[0.15] group-hover:grayscale-0 border border-stone-400 p-0.5 transition-all"
-                        onError={(e) => { e.currentTarget.parentElement.style.display = 'none'; }}
+                        referrerPolicy="no-referrer"
+                        className="w-full h-44 object-cover grayscale contrast-125 sepia-[0.15] group-hover:grayscale-0 group-hover:scale-[1.01] transition-all duration-300"
+                        onError={(e) => {
+                          if (e.currentTarget.src.includes('maxresdefault')) {
+                            e.currentTarget.src = e.currentTarget.src.replace('maxresdefault', 'hqdefault');
+                          } else {
+                            e.currentTarget.parentElement.style.display = 'none';
+                          }
+                        }}
                       />
                       {(story.sources?.[0]?.type === 'YOUTUBE' || story.sources?.[0]?.url?.includes('youtube.com')) && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/25 group-hover:bg-black/10 transition-colors">
-                          <div className="bg-[#1C1A17]/90 text-white border border-stone-300 px-3 py-1 flex items-center gap-1.5 shadow group-hover:bg-red-700 transition-all">
-                            <span className="text-xs text-red-500 group-hover:text-white">▶</span>
-                            <span className="text-[10px] font-ticker font-bold tracking-wider uppercase">Watch on YouTube</span>
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/25 group-hover:bg-black/35 transition-all">
+                          <div className="w-12 h-12 bg-red-600/90 text-white rounded-full flex items-center justify-center shadow-lg group-hover:bg-red-600 group-hover:scale-110 transition-all ring-3 ring-white">
+                            <svg className="w-6 h-6 fill-current translate-x-0.5" viewBox="0 0 24 24">
+                              <path d="M8 5v14l11-7z"/>
+                            </svg>
                           </div>
                         </div>
                       )}

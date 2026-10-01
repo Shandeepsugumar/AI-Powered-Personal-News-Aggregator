@@ -145,6 +145,9 @@ def get_latest_long_video_id(playlist_id):
         if not details: continue
         duration = details["contentDetails"]["duration"]
         title = details["snippet"]["title"]
+        # Skip live broadcasts or 0-duration streams
+        if details["snippet"].get("liveBroadcastContent") == "live" or duration in ["P0D", "PT0S"]:
+            continue
         # Accurately determine if a video is a Short by pinging the /shorts/ URL
         try:
             r = requests.head(f"https://www.youtube.com/shorts/{video_id}", allow_redirects=False, timeout=5)
@@ -232,19 +235,21 @@ def process_video(video_id):
     print(f"\n============================================================")
     print(f"Processing Video ID: {video_id}")
     print(f"============================================================")
-    # Try fetching English transcript
-    print("Checking for English transcript...")
+    # Try fetching transcript
+    print("Checking for transcript...")
     try:
         api = YouTubeTranscriptApi()
-        # The user's original script uses api.fetch()
-        fetched_data = api.fetch(video_id, languages=["en", "en-IN", "en-GB", "en-US", "ta"])
-        # If it returned a transcript, let's see if it's English
-        lang = getattr(fetched_data, 'language_code', 'unknown')
-        if not lang.startswith('en'):
-            # It's Tamil or something else, we want English
-            raise ValueError("Not English")
+        try:
+            fetched_data = api.fetch(video_id, languages=["en", "en-IN", "en-GB", "en-US", "ta", "hi"])
+        except Exception:
+            transcript_list = api.list(video_id)
+            available = [t.language_code for t in transcript_list]
+            t = transcript_list.find_transcript(available)
+            fetched_data = t.fetch()
+
+        lang = getattr(fetched_data, 'language_code', getattr(fetched_data, 'language', 'unknown'))
         print("\nTranscript found!")
-        print("Language:", getattr(fetched_data, 'language', lang))
+        print("Language:", lang)
         print("Language code:", lang)
         print("Auto-generated:", getattr(fetched_data, 'is_generated', False))
         # Create SRT
@@ -253,11 +258,15 @@ def process_video(video_id):
         srt_text = formatter.format_transcript(fetched_data)
         with open(os.path.join(SCRIPT_DIR, f"{video_id}.srt"), "w", encoding="utf-8") as file:
             file.write(srt_text)
-        # Create plain text (handle if snippets are dicts or objects)
-        try:
-            plain_text = "\n".join(snippet['text'] for snippet in fetched_data)
-        except TypeError:
-            plain_text = "\n".join(snippet.text for snippet in fetched_data)
+        # Create plain text (robust for dicts or FetchedTranscriptSnippet objects)
+        parts = []
+        for snippet in fetched_data:
+            if isinstance(snippet, dict):
+                parts.append(snippet.get("text", ""))
+            else:
+                parts.append(getattr(snippet, "text", str(snippet)))
+        plain_text = "\n".join(parts)
+
         with open(os.path.join(SCRIPT_DIR, f"{video_id}.txt"), "w", encoding="utf-8") as file:
             file.write(plain_text)
         print("\nFiles created successfully:")

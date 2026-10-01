@@ -42,7 +42,8 @@ async def _run_cycle_async():
     backend_dir = Path(__file__).parent.parent.resolve()
     yt_script = backend_dir / "youtube_extractor" / "main.py"
     rss_script = backend_dir / "rss_extractor" / "main.py"
-    env = dict(os.environ, PYTHONPATH=str(backend_dir))
+    port = os.environ.get("PORT", "8000")
+    env = dict(os.environ, PYTHONPATH=str(backend_dir), PORT=port, PYTHONUNBUFFERED="1")
     
     print("[Scheduler] Running youtube_extractor...")
     subprocess.run([sys.executable, str(yt_script)], cwd=str(backend_dir), env=env)
