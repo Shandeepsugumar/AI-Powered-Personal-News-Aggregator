@@ -385,88 +385,198 @@ export default function NewspaperView({ stories, followedSources = [], isLoading
 
       {/* SECTION 2: SECOND SECTION & DEVELOPMENTS (stories.slice(4)) */}
       {secondaryStories.length > 0 && (
-        <section className="pt-8">
-          <div className="border-b-2 border-[#262624] pb-1.5 mb-6 flex items-center justify-between">
-            <h3 className="text-xs font-ticker font-bold uppercase tracking-[0.25em] text-[#1C1A17]">
-              SECTION B: DEVELOPMENTS, SCIENCE & OPINION
-            </h3>
+        <section className="pt-10">
+          <div className="border-b-2 border-[#262624] pb-2 mb-8 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="w-2.5 h-2.5 bg-red-700 inline-block"></span>
+              <h3 className="text-sm font-ticker font-extrabold uppercase tracking-[0.25em] text-[#1C1A17]">
+                SECTION B: WIRE INVESTIGATIONS, VIDEO DISPATCHES & OPINION
+              </h3>
+            </div>
             <span className="text-[11px] font-editorial-body italic text-[#666059]">
-              ✦ Additional Telegraph Reports ✦
+              ✦ Additional Broadsheet Dispatches ({secondaryStories.length} Stories) ✦
             </span>
           </div>
 
-          {/* Multi-column masonry layout: seamless columns without vertical holes or grid gaps */}
-          <div className="columns-1 md:columns-2 lg:columns-3 gap-8 [column-fill:_balance]">
-            {secondaryStories.map((story) => (
-              <article key={story.id} className="break-inside-avoid mb-8 pb-6 border-b border-[#D5CEC2] flex flex-col justify-between">
-                <div>
+          {/* Section B Part 1: FEATURE STORY HERO SPREAD (if at least 1 story in Section B) */}
+          {secondaryStories[0] && (
+            <div className="border-b-2 border-[#262624] pb-8 mb-10">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center bg-[#EFECE4]/40 p-5 border border-[#D5CEC2]">
+                <div className="lg:col-span-7">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-[9px] font-ticker font-bold uppercase tracking-wider px-1.5 py-0.5 bg-[#EFECE4] text-[#1C1A17] border border-[#D5CEC2]">
-                      {story.category}
+                    <span className="bg-red-700 text-white font-ticker font-bold uppercase px-2 py-0.5 text-[10px] tracking-wider">
+                      MAJOR FEATURE · {secondaryStories[0].category}
                     </span>
-                    <span>•</span>
-                    {renderStancePill(story.stance)}
+                    {renderStancePill(secondaryStories[0].stance)}
+                    <span className="text-[#666059] ml-auto font-ticker text-[10px]">
+                      {formatTeletypeTime(secondaryStories[0].timestamp)}
+                    </span>
                   </div>
 
-                  <h4 className="text-xl font-bold font-headline text-[#1C1A17] leading-snug mb-2.5 hover:text-[#333]">
-                    {story.sources?.[0]?.url ? (
-                      <a href={story.sources[0].url} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                        {story.headline}
+                  <h3 className="text-2xl sm:text-3xl font-extrabold font-headline text-[#1C1A17] leading-tight my-3 hover:text-[#333]">
+                    {secondaryStories[0].sources?.[0]?.url ? (
+                      <a href={secondaryStories[0].sources[0].url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                        {secondaryStories[0].headline}
                       </a>
                     ) : (
-                      story.headline
+                      secondaryStories[0].headline
                     )}
-                  </h4>
+                  </h3>
 
-                  {story.imageUrl && (
-                    <a
-                      href={getVideoPlayUrl(story.sources?.[0])}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="relative block mb-3 group cursor-pointer overflow-hidden border border-stone-400 p-0.5 bg-stone-100"
-                    >
-                      <img
-                        src={story.imageUrl}
-                        alt=""
-                        referrerPolicy="no-referrer"
-                        className="w-full h-44 object-cover grayscale contrast-125 sepia-[0.15] group-hover:grayscale-0 group-hover:scale-[1.01] transition-all duration-300"
-                        onError={(e) => {
-                          if (e.currentTarget.src.includes('maxresdefault')) {
-                            e.currentTarget.src = e.currentTarget.src.replace('maxresdefault', 'hqdefault');
-                          } else {
-                            e.currentTarget.parentElement.style.display = 'none';
-                          }
-                        }}
-                      />
-                      {(story.sources?.[0]?.type === 'YOUTUBE' || story.sources?.[0]?.url?.includes('youtube.com')) && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/25 group-hover:bg-black/35 transition-all">
-                          <div className="w-12 h-12 bg-red-600/90 text-white rounded-full flex items-center justify-center shadow-lg group-hover:bg-red-600 group-hover:scale-110 transition-all ring-3 ring-white">
-                            <svg className="w-6 h-6 fill-current translate-x-0.5" viewBox="0 0 24 24">
-                              <path d="M8 5v14l11-7z"/>
-                            </svg>
+                  <p className="text-[#383531] text-base font-editorial-body leading-relaxed mb-4 text-justify">
+                    {secondaryStories[0].summary}
+                  </p>
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[#D5CEC2]">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[11px] font-ticker font-bold uppercase text-[#57524D]">Source:</span>
+                      {secondaryStories[0].sources?.map((s, i) => renderSourceBadge(s, i))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="lg:col-span-5">
+                  {secondaryStories[0].imageUrl && (
+                    <div className="relative overflow-hidden border-2 border-stone-800 p-1 bg-stone-100 shadow-md">
+                      <a
+                        href={getVideoPlayUrl(secondaryStories[0].sources?.[0])}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="relative block group cursor-pointer overflow-hidden max-h-72"
+                      >
+                        <img
+                          src={secondaryStories[0].imageUrl}
+                          alt={secondaryStories[0].headline}
+                          referrerPolicy="no-referrer"
+                          className="w-full h-64 object-cover grayscale contrast-125 sepia-[0.15] group-hover:grayscale-0 group-hover:scale-[1.02] transition-all duration-500"
+                          onError={(e) => {
+                            if (e.currentTarget.src.includes('maxresdefault')) {
+                              e.currentTarget.src = e.currentTarget.src.replace('maxresdefault', 'hqdefault');
+                            } else {
+                              e.currentTarget.parentElement.parentElement.style.display = 'none';
+                            }
+                          }}
+                        />
+                        {(secondaryStories[0].sources?.[0]?.type === 'YOUTUBE' || secondaryStories[0].sources?.[0]?.url?.includes('youtube.com')) && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/25 group-hover:bg-black/40 transition-all">
+                            <div className="w-14 h-14 bg-red-600/90 text-white rounded-full flex items-center justify-center shadow-2xl group-hover:bg-red-600 group-hover:scale-110 transition-all ring-4 ring-white">
+                              <svg className="w-7 h-7 fill-current translate-x-0.5" viewBox="0 0 24 24">
+                                <path d="M8 5v14l11-7z"/>
+                              </svg>
+                            </div>
                           </div>
+                        )}
+                      </a>
+                      <figcaption className="text-[10px] font-mono uppercase tracking-widest text-stone-600 mt-1 flex justify-between px-1">
+                        <span>{secondaryStories[0].sources?.[0]?.type === 'YOUTUBE' ? 'Plate · Motion Picture' : 'Plate · Wire Photogram'}</span>
+                        <span>{secondaryStories[0].sources?.[0]?.name}</span>
+                      </figcaption>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Section B Part 2: DIVERSE MULTI-COLUMN BROADSHEET (stories from index 1 onward in secondaryStories) */}
+          {secondaryStories.slice(1).length > 0 && (
+            <div className="columns-1 md:columns-2 lg:columns-3 gap-8 [column-fill:_balance]">
+              {secondaryStories.slice(1).map((story, idx) => {
+                const isYt = story.sources?.[0]?.type === 'YOUTUBE' || story.sources?.[0]?.url?.includes('youtube.com');
+                const hasImage = Boolean(story.imageUrl);
+                const isVisualCard = idx % 2 === 0 && hasImage;
+
+                return (
+                  <article
+                    key={story.id}
+                    className={`break-inside-avoid mb-8 pb-6 border-b border-[#D5CEC2] flex flex-col justify-between ${
+                      isYt ? 'bg-[#FAF7F2] p-4 border border-stone-300 shadow-sm' : ''
+                    }`}
+                  >
+                    <div>
+                      {/* Top Metadata */}
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`text-[9px] font-ticker font-bold uppercase tracking-wider px-1.5 py-0.5 border ${
+                          isYt ? 'bg-red-900 text-white border-red-950' : 'bg-[#EFECE4] text-[#1C1A17] border-[#D5CEC2]'
+                        }`}>
+                          {isYt ? '▶ VIDEO DISPATCH' : story.category}
+                        </span>
+                        <span>•</span>
+                        {renderStancePill(story.stance)}
+                      </div>
+
+                      {/* Headline */}
+                      <h4 className={`font-bold font-headline text-[#1C1A17] leading-snug mb-2.5 hover:text-[#333] ${
+                        isVisualCard ? 'text-xl' : 'text-lg'
+                      }`}>
+                        {story.sources?.[0]?.url ? (
+                          <a href={story.sources[0].url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                            {story.headline}
+                          </a>
+                        ) : (
+                          story.headline
+                        )}
+                      </h4>
+
+                      {/* Story Media (Video or Wire Photograph) */}
+                      {hasImage && (
+                        <div className="my-2.5">
+                          <a
+                            href={getVideoPlayUrl(story.sources?.[0])}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`relative block group cursor-pointer overflow-hidden border border-stone-400 p-0.5 bg-stone-100 ${
+                              isVisualCard ? '' : 'float-right ml-3 mb-2 w-28 h-20'
+                            }`}
+                          >
+                            <img
+                              src={story.imageUrl}
+                              alt=""
+                              referrerPolicy="no-referrer"
+                              className={`object-cover grayscale contrast-125 sepia-[0.15] group-hover:grayscale-0 group-hover:scale-[1.02] transition-all duration-300 ${
+                                isVisualCard ? 'w-full h-44' : 'w-full h-full'
+                              }`}
+                              onError={(e) => {
+                                if (e.currentTarget.src.includes('maxresdefault')) {
+                                  e.currentTarget.src = e.currentTarget.src.replace('maxresdefault', 'hqdefault');
+                                } else {
+                                  e.currentTarget.parentElement.parentElement.style.display = 'none';
+                                }
+                              }}
+                            />
+                            {isYt && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/25 group-hover:bg-black/35 transition-all">
+                                <div className={`${isVisualCard ? 'w-12 h-12 ring-3' : 'w-8 h-8 ring-2'} bg-red-600/90 text-white rounded-full flex items-center justify-center shadow-lg group-hover:bg-red-600 group-hover:scale-110 transition-all ring-white`}>
+                                  <svg className={`${isVisualCard ? 'w-6 h-6' : 'w-4 h-4'} fill-current translate-x-0.5`} viewBox="0 0 24 24">
+                                    <path d="M8 5v14l11-7z"/>
+                                  </svg>
+                                </div>
+                              </div>
+                            )}
+                          </a>
                         </div>
                       )}
-                    </a>
-                  )}
 
-                  <p className="text-[#383531] text-sm font-editorial-body leading-relaxed mb-4 text-justify">
-                    {story.summary}
-                  </p>
-                </div>
+                      {/* Summary with authentic styling */}
+                      <p className="text-[#383531] text-xs sm:text-sm font-editorial-body leading-relaxed mb-4 text-justify">
+                        {story.summary}
+                      </p>
+                    </div>
 
-                {/* Source Badge Footer */}
-                <div className="pt-3 border-t border-[#D5CEC2] flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {story.sources?.map((s, i) => renderSourceBadge(s, i))}
-                  </div>
-                  <span className="text-[10px] font-ticker text-[#78716C]">
-                    {formatTeletypeTime(story.timestamp)}
-                  </span>
-                </div>
-              </article>
-            ))}
-          </div>
+                    {/* Source Badge Footer */}
+                    <div className="pt-2.5 border-t border-[#D5CEC2] flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {story.sources?.map((s, i) => renderSourceBadge(s, i))}
+                      </div>
+                      <span className="text-[10px] font-ticker text-[#78716C]">
+                        {formatTeletypeTime(story.timestamp)}
+                      </span>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
         </section>
       )}
 
