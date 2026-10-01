@@ -6,30 +6,16 @@ def safe_print(*args, **kwargs):
         text = " ".join(str(a) for a in args)
         print(text.encode('ascii', errors='replace').decode('ascii'), **kwargs)
 
-from sqlalchemy.orm import Session
-from sqlalchemy import func
 from datetime import datetime, timedelta
-from db.database import StoryGroup, StorySource
+from db.mongo_models import StoryGroupMongo, StorySourceMongo
 
-def recompute_importance_ranking(db: Session, freshness_hours: int = 48):
-    """
-    Rank all active story_groups (within freshness window) by:
-      1. Distinct source count (descending)
-      2. Most recent updated_at (tie-breaker)
-      
-    Assign: 
-      Rank 1 -> 'lead' (only for NEWS_CATEGORIES)
-      source_count >= 2 (excluding lead) -> 'major' (only for NEWS_CATEGORIES)
-      source_count == 1 -> 'minor' (only for NEWS_CATEGORIES)
-      OTHER_CATEGORIES -> always 'feature'
-    """
+async def recompute_importance_ranking(freshness_hours: int = 48):
     NEWS_CATEGORIES = {"TECHNOLOGY", "BUSINESS", "SPORTS", "POLITICS", "SCIENCE"}
     freshness_threshold = datetime.utcnow() - timedelta(hours=freshness_hours)
     
-    # Get all active story groups
-    active_groups = db.query(StoryGroup).filter(
-        StoryGroup.updated_at >= freshness_threshold
-    ).all()
+    active_groups = await StoryGroupMongo.find(
+        StoryGroupMongo.updated_at >= freshness_threshold
+    ).to_list()
     
     if not active_groups:
         return
@@ -39,12 +25,12 @@ def recompute_importance_ranking(db: Session, freshness_hours: int = 48):
     for group in active_groups:
         if group.category.upper() not in NEWS_CATEGORIES:
             group.importance = "feature"
+            await group.save()
             continue
             
-        # Count distinct source names in StorySource for this group
-        source_count = db.query(StorySource.source_name).filter(
-            StorySource.story_id == group.id
-        ).distinct().count()
+        # Count distinct source names
+        sources = await StorySourceMongo.find(StorySourceMongo.story_id == group.id).to_list()
+        source_count = len(set([s.source_name for s in sources]))
         
         news_stats.append({
             "group": group,
@@ -52,18 +38,11 @@ def recompute_importance_ranking(db: Session, freshness_hours: int = 48):
             "updated_at": group.updated_at
         })
         
-    # Sort by source_count DESC, then updated_at DESC
     news_stats.sort(key=lambda x: (x["source_count"], x["updated_at"]), reverse=True)
     
     safe_print("\n========== STAGE: IMPORTANCE RANKING ==========")
     safe_print("Ranking Active Story Groups:")
     
-    # Print the ones that were skipped first
-    for group in active_groups:
-        if group.category.upper() not in NEWS_CATEGORIES:
-            safe_print(f"  - '{group.headline}' | Sources: N/A | Updated: {group.updated_at} -> SKIPPED ranking math - OTHER_CATEGORIES - hardcoded 'feature'")
-            
-    # Assign labels
     for idx, stat in enumerate(news_stats):
         group = stat["group"]
         source_count = stat["source_count"]
@@ -75,7 +54,7 @@ def recompute_importance_ranking(db: Session, freshness_hours: int = 48):
         else:
             group.importance = "minor"
             
+        await group.save()
         safe_print(f"  - '{group.headline}' | Sources: {source_count} | Updated: {stat['updated_at']} -> {group.importance}")
 
     safe_print("===============================================\n")
-    db.commit()

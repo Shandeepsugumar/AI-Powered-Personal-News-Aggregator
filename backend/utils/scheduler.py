@@ -3,7 +3,7 @@ import subprocess
 import sys
 from pathlib import Path
 from apscheduler.schedulers.background import BackgroundScheduler
-from db.database import SessionLocal, StorySource, StoryGroup
+from db.mongo_models import StorySourceMongo, StoryGroupMongo
 from db.mongo_models import User, Source
 import smtplib
 from email.mime.text import MIMEText
@@ -51,9 +51,9 @@ async def _run_cycle_async():
     subprocess.run([sys.executable, str(rss_script)], cwd=str(backend_dir), env=env)
     
     print("[Scheduler] Extractors finished. Sending notifications...")
-    send_notifications(source_to_users)
+    await send_notifications(source_to_users)
 
-def send_notifications(source_to_users):
+def await send_notifications(source_to_users):
     db = SessionLocal()
     try:
         # Find all un-emailed, genuinely new contributions
@@ -80,7 +80,8 @@ def send_notifications(source_to_users):
             source_name_lower = src.source_name.lower()
             subscribers = source_to_users.get(source_name_lower, set())
             
-            group = src.group
+            from beanie import PydanticObjectId
+            group = await StoryGroupMongo.get(src.story_id)
             if not group:
                 continue
                 
@@ -89,7 +90,7 @@ def send_notifications(source_to_users):
                 "category": group.category,
                 "source_name": src.source_name,
                 "source_url": src.source_url,
-                "group_id": group.id
+                "group_id": str(group.id)
             }
             
             for email, name in subscribers:

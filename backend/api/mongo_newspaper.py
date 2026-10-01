@@ -15,7 +15,116 @@ import time
 from datetime import datetime, timezone
 from typing import Optional, List
 
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Query
+from starlette.concurrency import run_in_threadpool
+from fastapi import APIRouter
+
+from fastapi.responses import StreamingResponse
+import asyncio
+from typing import AsyncGenerator
+
+async def _stream_extractors(user_id_str: str) -> AsyncGenerator[str, None]:
+    import subprocess
+    import sys
+    from pathlib import Path
+    import os
+    
+    yield "data: {"type": "log", "message": "Starting extraction process..."}\n\n"
+    
+    backend_dir = Path(__file__).parent.parent.resolve()
+    yt_script = backend_dir / "youtube_extractor" / "main.py"
+    rss_script = backend_dir / "rss_extractor" / "main.py"
+    
+    env = dict(os.environ, PYTHONPATH=str(backend_dir), USER_ID=user_id_str, PYTHONUNBUFFERED="1")
+    
+    yield "data: {"type": "log", "message": "Running YouTube extractor..."}\n\n"
+    process_yt = subprocess.Popen([sys.executable, str(yt_script)], cwd=str(backend_dir), env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    for line in process_yt.stdout:
+        import json
+        yield f"data: {json.dumps({'type': 'log', 'message': line.strip()})}\n\n"
+        await asyncio.sleep(0.01)
+    process_yt.wait()
+
+    yield "data: {"type": "log", "message": "Running RSS/Blog extractor..."}\n\n"
+    process_rss = subprocess.Popen([sys.executable, str(rss_script)], cwd=str(backend_dir), env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    for line in process_rss.stdout:
+        import json
+        yield f"data: {json.dumps({'type': 'log', 'message': line.strip()})}\n\n"
+        await asyncio.sleep(0.01)
+    process_rss.wait()
+
+    yield "data: {"type": "log", "message": "Extraction finished. Compiling edition..."}\n\n"
+    
+@router.get("/stream-refresh")
+async def stream_refresh(token: str):
+    from api.mongo_auth import get_current_user
+    from fastapi.security import HTTPAuthorizationCredentials
+    
+    # We must validate the token manually since it's a query param
+    try:
+        user = await get_current_user(HTTPAuthorizationCredentials(scheme="Bearer", credentials=token))
+    except Exception as e:
+        return {"error": str(e)}
+
+    async def event_generator():
+        try:
+            # 1. Stream the extraction process
+            async for chunk in _stream_extractors(str(user.id)):
+                yield chunk
+            
+            # 2. Run the DB compilation
+            today = _local_date_string()
+            now = datetime.utcnow()
+            
+            prior_editions = await Edition.find(
+                Edition.userId == user.id,
+                Edition.dateString == today,
+            ).sort(+Edition.editionNumber).to_list()
+            
+            seen_urls: set = set()
+            seen_headlines: set = set()
+            seen_ids: set = set()
+            for ed in prior_editions:
+                for story in ed.stories:
+                    seen_ids.add(str(story.id))
+                    if story.sources and story.sources[0].url:
+                        seen_urls.add(story.sources[0].url.strip().lower())
+                    if story.headline:
+                        seen_headlines.add(story.headline.strip().lower())
+                        
+            candidates = await _get_live_stories()
+            
+            next_num = len(prior_editions) + 1
+            
+            for art in candidates:
+                url_match = (art.sources[0].url.strip().lower() if art.sources else "") in seen_urls
+                headline_match = art.headline.strip().lower() in seen_headlines
+                id_match = str(art.id) in seen_ids
+                if id_match or url_match or headline_match:
+                    art.is_new = False
+                else:
+                    art.is_new = True
+
+            new_edition = Edition(
+                userId=user.id,
+                editionNumber=next_num,
+                dateString=today,
+                stories=candidates,
+                createdAt=now,
+            )
+            await new_edition.insert()
+            
+            is_new = any(s.is_new for s in candidates)
+            message = "Fresh dispatches arrived." if is_new else "Presses waiting: No fresh dispatches since previous edition."
+            
+            import json
+            yield f"data: {json.dumps({'type': 'complete', 'isNew': is_new, 'message': message})}\n\n"
+            
+        except Exception as e:
+            import json
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+, HTTPException, Depends, BackgroundTasks, Query
 from beanie import PydanticObjectId
 
 from db.mongo_models import Edition, Story, StorySource, User
@@ -30,7 +139,7 @@ def run_extractors_sync(user_id_str: str):
     yt_script = backend_dir / "youtube_extractor" / "main.py"
     rss_script = backend_dir / "rss_extractor" / "main.py"
     
-    env = dict(os.environ, PYTHONPATH=str(backend_dir), USER_ID=user_id_str)
+    env = dict(os.environ, PYTHONPATH=str(backend_dir), USER_ID=user_id_str, PYTHONUNBUFFERED="1")
     print(f"Running extractors synchronously for user {user_id_str}...")
     subprocess.run([sys.executable, str(yt_script)], cwd=str(backend_dir), env=env)
     subprocess.run([sys.executable, str(rss_script)], cwd=str(backend_dir), env=env)
@@ -38,7 +147,6 @@ def run_extractors_sync(user_id_str: str):
 
 from datetime import datetime, timezone
 from typing import List, Optional
-from db.database import SessionLocal, StoryGroup
 
 router = APIRouter(prefix="/api/newspaper", tags=["newspaper"])
 
@@ -65,16 +173,11 @@ def _local_date_string(d: Optional[datetime] = None) -> str:
     return d.strftime("%Y-%m-%d")
 
 
-def _get_live_stories(edition_number: int = 1, now: Optional[datetime] = None) -> List[Story]:
-    """
-    Load stories from SQLite StoryGroup table (the final AI summary).
-    Falls back to BASE_STORIES if database is empty.
-    """
+async def _get_live_stories(edition_number: int = 1, now: Optional[datetime] = None) -> List[Story]:
     now = now or datetime.utcnow()
-    
+    from db.mongo_models import StoryGroupMongo, StorySourceMongo
     try:
-        db = SessionLocal()
-        groups = db.query(StoryGroup).all()
+        groups = await StoryGroupMongo.find_all().to_list()
         
         if groups:
             NEWS_CATEGORIES = ["TECHNOLOGY", "BUSINESS", "SPORTS", "POLITICS", "SCIENCE"]
@@ -103,8 +206,9 @@ def _get_live_stories(edition_number: int = 1, now: Optional[datetime] = None) -
                 else:
                     importance = group.importance if group.importance in ["lead", "major", "minor"] else "minor"
                 
+                mongo_sources = await StorySourceMongo.find(StorySourceMongo.story_id == group.id).to_list()
                 sources = []
-                for s in group.sources:
+                for s in mongo_sources:
                     sources.append(StorySource(name=s.source_name, url=s.source_url, type=s.source_type.upper()))
                 
                 if not sources:
@@ -126,13 +230,11 @@ def _get_live_stories(edition_number: int = 1, now: Optional[datetime] = None) -
                     timestamp=group.created_at or now,
                     is_new=True
                 ))
-            db.close()
             return stories
     except Exception as e:
-        print(f"[newspaper] Error reading from SQLite database: {e}")
+        print(f"[newspaper] Error reading from MongoDB database: {e}")
 
-    # Fallback to BASE_STORIES
-    # Fallback to BASE_STORIES
+    import time
     return [
         Story(
             id=f"story-ed{edition_number}-{idx + 1}-{int(time.time()):x}",
@@ -146,6 +248,7 @@ def _get_live_stories(edition_number: int = 1, now: Optional[datetime] = None) -
         )
         for idx, s in enumerate(BASE_STORIES)
     ]
+
 
 
 def _edition_to_dict(edition: Edition) -> dict:
@@ -190,7 +293,7 @@ async def get_latest(current_user: User = Depends(get_current_user)):
 
     if not todays_editions:
         now = datetime.utcnow()
-        stories = _get_live_stories(1, now)
+        stories = await _get_live_stories(1, now)
         first_edition = Edition(
             userId=current_user.id,
             editionNumber=1,
@@ -214,7 +317,7 @@ async def refresh(current_user: User = Depends(get_current_user)):
     Returns {isNew, edition, message} - mirrors Node behaviour exactly.
     """
     # Run extractors synchronously scoped to this user only
-    run_extractors_sync(str(current_user.id))
+    await run_in_threadpool(run_extractors_sync, str(current_user.id))
 
     today = _local_date_string()
     now = datetime.utcnow()
@@ -235,7 +338,7 @@ async def refresh(current_user: User = Depends(get_current_user)):
             if story.headline:
                 seen_headlines.add(story.headline.strip().lower())
 
-    candidates = _get_live_stories()
+    candidates = await _get_live_stories()
     
     next_num = len(prior_editions) + 1
     

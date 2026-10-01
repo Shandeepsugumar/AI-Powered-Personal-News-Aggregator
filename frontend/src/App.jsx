@@ -22,6 +22,8 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isSourcesOpen, setIsSourcesOpen] = useState(false);
+  const [streamLogs, setStreamLogs] = useState([]);
+  const [isStreaming, setIsStreaming] = useState(false);
 
   // Multi-Edition & Archive state
   const [activeEditionNumber, setActiveEditionNumber] = useState(1);
@@ -133,6 +135,13 @@ export default function App() {
     }
   }, []);
 
+  useEffect(() => {
+    const el = document.getElementById('terminal-scroll');
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [streamLogs]);
+
   // Handlers
   const handleAuthSuccess = (userData) => {
     setUser(userData);
@@ -179,62 +188,59 @@ export default function App() {
     setFollowedSources(newSources);
   };
 
-  const handleRefreshEdition = async () => {
+  const handleRefreshEdition = () => {
     setIsLoading(true);
     setCooldownNotice(null);
 
-    // If user is authenticated, call backend POST /api/newspaper/refresh
     if (user?.token) {
-      try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL || "https://ai-powered-personal-news-aggregator.onrender.com"}` + ""}/api/newspaper/refresh`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${user.token}`
-          }
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-          if (data.isNew === false) {
-            // No fresh dispatches / deduplication notice
-            setCooldownNotice({
-              message: data.message || "Presses waiting: No fresh dispatches since previous edition."
+      setStreamLogs([]);
+      setIsStreaming(true);
+      
+      const evtSource = new EventSource(`${import.meta.env.VITE_API_URL || `${import.meta.env.VITE_API_URL || "https://ai-powered-personal-news-aggregator.onrender.com"}` + ""}/api/newspaper/stream-refresh?token=${user.token}`);
+      
+      evtSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'log') {
+            setStreamLogs(prev => [...prev, data.message]);
+          } else if (data.type === 'complete') {
+            evtSource.close();
+            setIsStreaming(false);
+            
+            if (data.isNew === false) {
+              setCooldownNotice({
+                message: data.message || "Presses waiting: No fresh dispatches since previous edition."
+              });
+            } else {
+              setCooldownNotice(null);
+            }
+            
+            // Reload the newspaper
+            loadUserNewspaperAndArchives(user.token).finally(() => {
+              setIsLoading(false);
             });
-
-            if (data.edition?.stories) {
-              setEdition(data.edition.stories);
-              setActiveEditionNumber(data.edition.editionNumber || 1);
-              setActiveDateString(data.edition.dateString || getLocalDateString());
-              setActiveEditionId(data.edition._id);
-              localStorage.setItem('feedtoread_edition', JSON.stringify(data.edition.stories));
-            }
-          } else {
-            // Fresh issue published
-            setCooldownNotice(null);
-            if (data.edition?.stories) {
-              setEdition(data.edition.stories);
-              setActiveEditionNumber(data.edition.editionNumber || 1);
-              setActiveDateString(data.edition.dateString || getLocalDateString());
-              setActiveEditionId(data.edition._id);
-              localStorage.setItem('feedtoread_edition', JSON.stringify(data.edition.stories));
-            }
-            // Refresh archives list
-            await fetchArchivesList(user.token);
+          } else if (data.type === 'error') {
+            console.error('Extraction error:', data.message);
+            setStreamLogs(prev => [...prev, `ERROR: ${data.message}`]);
+            evtSource.close();
+            setIsStreaming(false);
+            setIsLoading(false);
           }
-        } else {
-          console.error('Failed to refresh edition:', data.error);
+        } catch (e) {
+          console.error("Failed to parse SSE message", e);
         }
-      } catch (err) {
-        console.error('Error refreshing edition:', err);
-      } finally {
+      };
+      
+      evtSource.onerror = (err) => {
+        console.error("EventSource failed:", err);
+        setStreamLogs(prev => [...prev, "Connection lost. Reconnecting or failed."]);
+        evtSource.close();
+        setIsStreaming(false);
         setIsLoading(false);
-      }
+      };
       return;
     }
 
-    // Guest fallback - no hardcoded mock data
     setTimeout(() => {
       setEdition([]);
       setIsLoading(false);
@@ -332,7 +338,29 @@ export default function App() {
   });
 
   return (
-    <div className="min-h-screen bg-[#F8F5EE] text-[#1C1A17] font-editorial-body flex flex-col selection:bg-[#262624] selection:text-[#F8F5EE]">
+    <div className=
+
+      {isStreaming && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-[#1C1A17] w-full max-w-2xl rounded-sm border border-stone-700 shadow-2xl flex flex-col overflow-hidden">
+            <div className="bg-[#2C2A27] px-4 py-2 border-b border-stone-700 flex items-center justify-between">
+              <span className="text-stone-300 font-mono text-sm tracking-wider uppercase">Editorial Desk - Live Extraction</span>
+              <div className="flex gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-stone-600"></div>
+                <div className="w-2.5 h-2.5 rounded-full bg-stone-600"></div>
+                <div className="w-2.5 h-2.5 rounded-full bg-green-600 animate-pulse"></div>
+              </div>
+            </div>
+            <div className="p-4 bg-[#121110] h-80 overflow-y-auto font-mono text-xs text-stone-400 space-y-1" id="terminal-scroll">
+              {streamLogs.map((log, i) => (
+                <div key={i}>{log}</div>
+              ))}
+              <div className="animate-pulse">_</div>
+            </div>
+          </div>
+        </div>
+      )}
+"min-h-screen bg-[#F8F5EE] text-[#1C1A17] font-editorial-body flex flex-col selection:bg-[#262624] selection:text-[#F8F5EE]">
       <div className="flex-1">
         <Masthead
           user={user}

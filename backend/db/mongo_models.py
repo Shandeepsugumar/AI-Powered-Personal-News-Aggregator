@@ -91,3 +91,55 @@ class UserStoryStatusMongo(Document):
 
     class Settings:
         name = "user_story_status"
+
+class ContentItemMongo(Document):
+    source_name: str
+    source_type: str
+    source_url: str
+    title: Optional[str] = None
+    raw_content: str
+    content_hash: str
+    published_at: Optional[datetime] = None
+    fetched_at: datetime = Field(default_factory=datetime.utcnow)
+    processing_status: str = "pending"
+
+    class Settings:
+        name = "content_items"
+
+class SummaryItemMongo(Document):
+    content_id: PydanticObjectId
+    headline: str
+    summary: str
+    category: str
+    is_news: bool = True
+    event: Optional[str] = None
+    stance: Optional[str] = None
+    key_facts: Optional[dict] = None
+
+    class Settings:
+        name = "summary_items"
+
+class StoryGroupMongo(Document):
+    headline: str
+    summary: str
+    category: str
+    stance: Optional[str] = None
+    importance: Optional[str] = None
+    embedding: Optional[List[float]] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Settings:
+        name = "story_groups"
+
+class StorySourceMongo(Document):
+    story_id: PydanticObjectId
+    content_id: Optional[PydanticObjectId] = None
+    source_name: str
+    source_url: str
+    source_type: str
+    is_new_contribution: bool = False
+    emailed: bool = False
+
+    class Settings:
+        name = "story_sources"
